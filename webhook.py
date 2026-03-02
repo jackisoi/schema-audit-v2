@@ -29,11 +29,11 @@ def is_page_blocked(scan):
     """Returns True if the page is blocked by Cloudflare or a JS gate."""
     pt = scan.get("page_text", {})
     text = pt.get("text") or ""
-    word_count = pt.get("word_count", 0)
+    html_text = text.lower()
     return (
-        word_count < 50 or
-        "Enable JavaScript" in text or
-        "cf-browser-verification" in text
+        "enable javascript and cookies" in html_text or
+        "cf-browser-verification" in html_text or
+        ("just a moment" in html_text and "cloudflare" in html_text)
     )
 
 
