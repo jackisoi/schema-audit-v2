@@ -1,37 +1,86 @@
+import os
 import re
+import requests
+import cloudscraper
 import trafilatura
 import extruct
 from bs4 import BeautifulSoup
 from w3lib.html import get_base_url
 from playwright.sync_api import sync_playwright
+from dotenv import load_dotenv
+
+load_dotenv()
+
+SCRAPINGBEE_API_KEY = os.getenv("SCRAPINGBEE_API_KEY")
+
+
+def _is_blocked(html):
+    """Returns True if the HTML looks like a Cloudflare block page."""
+    if not html or len(html) < 500:
+        return True
+    lower = html.lower()
+    return (
+        "enable javascript and cookies" in lower or
+        "cf-browser-verification" in lower or
+        "just a moment" in lower and "cloudflare" in lower
+    )
+
+
+def fetch_html_scrapingbee(url):
+    """Fetch via ScrapingBee residential proxy — bypasses Cloudflare Pro/Enterprise."""
+    response = requests.get(
+        "https://app.scrapingbee.com/api/v1/",
+        params={
+            "api_key": SCRAPINGBEE_API_KEY,
+            "url": url,
+            "render_js": "true",
+            "premium_proxy": "true",
+            "block_ads": "true",
+        },
+        timeout=60
+    )
+    response.raise_for_status()
+    return response.text
 
 
 def fetch_html(url):
-    # Try cloudscraper first — handles Cloudflare and most sites
+    """Fetch HTML with 3-level fallback:
+    1. cloudscraper (free, handles basic Cloudflare)
+    2. ScrapingBee residential proxy (paid, handles Cloudflare Pro/Enterprise)
+    3. Playwright (JS rendering fallback)
+    """
+    # --- Step 1: cloudscraper ---
     try:
-        import cloudscraper
         scraper = cloudscraper.create_scraper()
-        response = scraper.get(url, timeout=30)
-        response.encoding = response.apparent_encoding
-        html = response.text
-        if len(html) > 1000 and "Enable JavaScript" not in html:
+        html = scraper.get(url, timeout=20).text
+        if not _is_blocked(html):
+            print(f"    [scraper] cloudscraper OK: {url}")
             return html
-    except Exception:
-        pass
+        print(f"    [scraper] cloudscraper blocked, trying ScrapingBee...")
+    except Exception as e:
+        print(f"    [scraper] cloudscraper error: {e}")
 
-    # Fallback to Playwright — for pure JS/SPA sites
-    from playwright.sync_api import sync_playwright
+    # --- Step 2: ScrapingBee ---
+    if SCRAPINGBEE_API_KEY:
+        try:
+            html = fetch_html_scrapingbee(url)
+            if not _is_blocked(html):
+                print(f"    [scraper] ScrapingBee OK: {url}")
+                return html
+            print(f"    [scraper] ScrapingBee also blocked, trying Playwright...")
+        except Exception as e:
+            print(f"    [scraper] ScrapingBee error: {e}")
+    else:
+        print(f"    [scraper] No SCRAPINGBEE_API_KEY set, skipping...")
+
+    # --- Step 3: Playwright ---
+    print(f"    [scraper] Falling back to Playwright: {url}")
     with sync_playwright() as p:
-        browser = p.chromium.launch(args=[
-            "--no-sandbox",
-            "--disable-setuid-sandbox",
-            "--disable-blink-features=AutomationControlled"
-        ])
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        browser = p.chromium.launch(
+            args=["--no-sandbox", "--disable-blink-features=AutomationControlled"]
         )
-        page = context.new_page()
-        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        page = browser.new_page()
+        page.goto(url, wait_until="networkidle", timeout=30000)
         html = page.content()
         browser.close()
         return html
