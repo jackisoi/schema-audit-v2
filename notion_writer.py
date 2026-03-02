@@ -105,8 +105,11 @@ def sanitize_blocks(blocks):
         for rt in rich_text:
             if isinstance(rt, dict):
                 text_obj = rt.get("text", {})
+                # Move misplaced annotations from text{} up to rt level
                 if "annotations" in text_obj:
                     rt["annotations"] = text_obj.pop("annotations")
+                # Strip invalid keys from text{} — only 'content' and 'link' are allowed
+                rt["text"] = {k: v for k, v in text_obj.items() if k in {"content", "link"}}
                 clean_rt.append(rt)
         if rich_text:
             inner["rich_text"] = clean_rt
