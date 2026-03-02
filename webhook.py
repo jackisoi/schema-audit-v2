@@ -108,6 +108,10 @@ def webhook():
             print(f"  Done: {notion_url}")
             results.append({"url": url, "notion": notion_url})
 
+            sd = scan["structured_data"]
+            json_ld = sd.get("json-ld", [])
+            schemas_found, schema_ids = extract_schemas_from_json_ld(json_ld)
+
             page_summaries.append({
                 "url": url,
                 "level": level,
@@ -115,6 +119,8 @@ def webhook():
                 "used_retry": used_retry,
                 "recommended_schemas": result.get("recommended_schemas", []),
                 "recommended_ids": result.get("recommended_ids", []),
+                "schemas_found": schemas_found,
+                "schema_ids": schema_ids,
                 "content_analysis": scan["content_analysis"]
             })
 
