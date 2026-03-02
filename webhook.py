@@ -8,7 +8,6 @@ from claude_agent import (
     analyze_with_scan,
     generate_executive_summary,
     generate_qa_report,
-    extract_schemas_from_json_ld,
     extract_recommended_schemas
 )
 from notion_writer import (
