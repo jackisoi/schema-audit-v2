@@ -1,4 +1,3 @@
-```python
 import os
 import json
 import re
@@ -327,4 +326,3 @@ Rules:
     if result is not None:
         return result
     raise ValueError(f"QA report parse failed. Last 300: ...{raw[-300:]}")
-```
