@@ -37,6 +37,8 @@ def is_page_blocked(scan):
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    if request.args.get("key") != os.getenv("WEBHOOK_SECRET"):
+        return jsonify({"status": "unauthorized"}), 401
     try:
         raw = request.form.get("rawRequest", "{}")
         try:
