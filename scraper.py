@@ -15,28 +15,42 @@ SCRAPINGBEE_API_KEY = os.getenv("SCRAPINGBEE_API_KEY")
 
 
 def _is_blocked(html):
-    """Returns True if the HTML looks like a Cloudflare block page."""
+    """Returns True if the HTML looks like a Cloudflare block page,
+    or if the page is a JS-rendered SPA shell with too little visible text."""
     if not html or len(html) < 500:
         return True
     lower = html.lower()
-    return (
+    # Hard block: explicit Cloudflare challenge phrases
+    if (
         "enable javascript and cookies" in lower or
         "cf-browser-verification" in lower or
-        "just a moment" in lower and "cloudflare" in lower
-    )
+        ("just a moment" in lower and "cloudflare" in lower)
+    ):
+        return True
+    # Soft block: HTML arrived but visible text is too sparse (SPA shell)
+    soup = BeautifulSoup(html, "lxml")
+    visible_text = soup.get_text(" ", strip=True)
+    if len(visible_text.split()) < 100:
+        return True
+    return False
 
 
-def fetch_html_scrapingbee(url):
-    """Fetch via ScrapingBee residential proxy — bypasses Cloudflare Pro/Enterprise."""
+def fetch_html_scrapingbee(url, premium=False):
+    """Fetch via ScrapingBee with JS rendering.
+    premium=False → 5 credits per request (standard proxy)
+    premium=True  → 75 credits per request (residential proxy, bypasses CF Pro)
+    """
+    params = {
+        "api_key": SCRAPINGBEE_API_KEY,
+        "url": url,
+        "render_js": "true",
+        "block_ads": "true",
+    }
+    if premium:
+        params["premium_proxy"] = "true"
     response = requests.get(
         "https://app.scrapingbee.com/api/v1/",
-        params={
-            "api_key": SCRAPINGBEE_API_KEY,
-            "url": url,
-            "render_js": "true",
-            "premium_proxy": "true",
-            "block_ads": "true",
-        },
+        params=params,
         timeout=60
     )
     response.raise_for_status()
@@ -44,10 +58,11 @@ def fetch_html_scrapingbee(url):
 
 
 def fetch_html(url):
-    """Fetch HTML with 3-level fallback:
-    1. cloudscraper (free, handles basic Cloudflare)
-    2. ScrapingBee residential proxy (paid, handles Cloudflare Pro/Enterprise)
-    3. Playwright (JS rendering fallback)
+    """Fetch HTML with 4-level fallback:
+    1. cloudscraper          — free, handles basic Cloudflare (0 credits)
+    2. ScrapingBee standard  — JS rendering, shared proxy (5 credits)
+    3. ScrapingBee premium   — JS rendering, residential proxy, CF Pro/Enterprise (75 credits)
+    4. Playwright            — local headless browser, last resort
     """
     # --- Step 1: cloudscraper ---
     try:
@@ -56,24 +71,34 @@ def fetch_html(url):
         if not _is_blocked(html):
             print(f"    [scraper] cloudscraper OK: {url}")
             return html
-        print(f"    [scraper] cloudscraper blocked, trying ScrapingBee...")
+        print(f"    [scraper] cloudscraper blocked, trying ScrapingBee standard...")
     except Exception as e:
         print(f"    [scraper] cloudscraper error: {e}")
 
-    # --- Step 2: ScrapingBee ---
     if SCRAPINGBEE_API_KEY:
+        # --- Step 2: ScrapingBee standard (5 credits) ---
         try:
-            html = fetch_html_scrapingbee(url)
+            html = fetch_html_scrapingbee(url, premium=False)
             if not _is_blocked(html):
-                print(f"    [scraper] ScrapingBee OK: {url}")
+                print(f"    [scraper] ScrapingBee standard OK: {url}")
                 return html
-            print(f"    [scraper] ScrapingBee also blocked, trying Playwright...")
+            print(f"    [scraper] ScrapingBee standard blocked, trying ScrapingBee premium...")
         except Exception as e:
-            print(f"    [scraper] ScrapingBee error: {e}")
-    else:
-        print(f"    [scraper] No SCRAPINGBEE_API_KEY set, skipping...")
+            print(f"    [scraper] ScrapingBee standard error: {e}")
 
-    # --- Step 3: Playwright ---
+        # --- Step 3: ScrapingBee premium (75 credits) ---
+        try:
+            html = fetch_html_scrapingbee(url, premium=True)
+            if not _is_blocked(html):
+                print(f"    [scraper] ScrapingBee premium OK: {url}")
+                return html
+            print(f"    [scraper] ScrapingBee premium also blocked, trying Playwright...")
+        except Exception as e:
+            print(f"    [scraper] ScrapingBee premium error: {e}")
+    else:
+        print(f"    [scraper] No SCRAPINGBEE_API_KEY set, skipping ScrapingBee...")
+
+    # --- Step 4: Playwright ---
     print(f"    [scraper] Falling back to Playwright: {url}")
     with sync_playwright() as p:
         browser = p.chromium.launch(
