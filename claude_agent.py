@@ -1,125 +1,28 @@
 import os
 import json
-import re
 import anthropic
 from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 load_dotenv()
 
-with open("prompt.txt", "r", encoding="utf-8") as f:
-    PROMPT_TEMPLATE = f.read()
-
 client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 SYSTEM_PROMPT = "You are a Schema.org structured data expert and a JSON API. Return only a raw JSON array of Notion blocks. No markdown fences, no surrounding text."
 
 
-def extract_schemas_from_json_ld(json_ld):
-    """Extract schema @types and @ids from json-ld blocks."""
-    types = set()
-    ids = []
-    for block in json_ld:
-        items = block.get("@graph", [block])
-        for item in items:
-            t = item.get("@type")
-            if isinstance(t, list):
-                types.update(t)
-            elif t:
-                types.add(t)
-            i = item.get("@id")
-            if i:
-                ids.append(i)
-    return sorted(types), ids
-
-
-def extract_recommended_schemas(blocks):
-    """Extract full JSON-LD code blocks recommended in a report."""
-    schemas = []
-    for block in blocks:
-        if block.get("type") == "code":
-            content = "".join(
-                rt.get("text", {}).get("content", "")
-                for rt in block.get("code", {}).get("rich_text", [])
-            )
-            try:
-                parsed = json.loads(content)
-                schemas.append(parsed)
-            except json.JSONDecodeError:
-                if '"@type"' in content:
-                    schemas.append(content)
-    return schemas
-
-
-def extract_faq_summary(json_ld):
-    """Extract FAQ questions/answers as compact readable list for analysis."""
-    faqs = []
-    for block in json_ld:
-        items = block.get("@graph", [block])
-        for item in items:
-            if item.get("@type") == "FAQPage":
-                for i, q in enumerate(item.get("mainEntity", []), 1):
-                    question = q.get("name", "")
-                    answer_obj = q.get("acceptedAnswer", {})
-                    answer = answer_obj.get("text", "") if isinstance(answer_obj, dict) else ""
-                    faqs.append(f"Q{i}: {question[:120]}\nA{i}: {answer[:120]}")
-    return faqs
-
-
-def summarize_existing_schemas(json_ld):
-    """Return existing schemas with FAQPage mainEntity replaced by a count summary."""
-    summarized = []
-    for block in json_ld:
-        if "@graph" in block:
-            graph = []
-            for item in block["@graph"]:
-                if item.get("@type") == "FAQPage":
-                    questions = item.get("mainEntity", [])
-                    item = dict(item)
-                    item["mainEntity"] = f"// {len(questions)} questions — see FAQ CONTENT section below"
-                graph.append(item)
-            block = dict(block)
-            block["@graph"] = graph
-        elif block.get("@type") == "FAQPage":
-            questions = block.get("mainEntity", [])
-            block = dict(block)
-            block["mainEntity"] = f"// {len(questions)} questions — see FAQ CONTENT section below"
-        summarized.append(block)
-    return summarized
-
-
-def safe_parse(raw_text):
-    """Try json.loads first, then json_repair as fallback."""
-    try:
-        return json.loads(raw_text)
-    except json.JSONDecodeError:
-        try:
-            from json_repair import repair_json
-            repaired = repair_json(raw_text)
-            return json.loads(repaired)
-        except Exception:
-            return None
-
-
-def analyze_with_scan(scan_result, level, page_type, project, parent_context=None):
+def analyze_with_scan(scan_result, level, page_type, project):
     url = scan_result["url"]
     sd = scan_result["structured_data"]
     ca = scan_result["content_analysis"]
     pt = scan_result.get("page_text", {})
 
     json_ld = sd.get("json-ld", [])
-
-    summarized = summarize_existing_schemas(json_ld)
-    existing_schemas = json.dumps(summarized, ensure_ascii=False) if summarized else "None found"
-
-    faq_items = extract_faq_summary(json_ld)
-    faq_section = ""
-    if faq_items:
-        faq_section = f"\nFAQ CONTENT ({len(faq_items)} items — check for swapped Q/A where answer appears in question field or vice versa):\n"
-        faq_section += "\n".join(faq_items)
+    existing_schemas = json.dumps(json_ld, ensure_ascii=False) if json_ld else "None found"
 
     content_summary = f"""H1: {ca.get('h1') or 'Not found'}
 H2s: {', '.join(ca.get('h2s', [])[:5]) or 'None'}
+Images: {ca.get('images', {}).get('total', 0)} total, {ca.get('images', {}).get('missing_alt', 0)} missing alt
 Video: {'Yes' if ca.get('video') else 'No'}
 Forms: {ca.get('forms') or 'None'}
 FAQ patterns: {'Yes' if ca.get('faq_patterns') else 'No'}
@@ -132,26 +35,13 @@ Email: {ca.get('contact_info', {}).get('email') or 'Not found'}"""
     is_subpage = len(path_parts) >= 2
     subpage_note = "YES - reference parent @id, do not redefine parent entity" if is_subpage else "NO - this is a top-level page"
 
-    parent_section = ""
-    if parent_context:
-        parent_section = "\nRECOMMENDED SCHEMAS FROM PARENT PAGES:\n"
-        parent_section += "CRITICAL: Use these @ids exactly. Do not redefine these entities.\n"
-        for lvl in sorted(parent_context.keys(), key=lambda x: str(x)):
-            data = parent_context[lvl]
-            parent_section += f"\nLevel {lvl} ({data['url']}):\n"
-            for schema in data["recommended_schemas"]:
-                if isinstance(schema, dict):
-                    parent_section += json.dumps(schema, ensure_ascii=False, indent=2)[:800] + "\n"
-                else:
-                    parent_section += str(schema)[:800] + "\n"
-
     def build_prompt(text_limit):
         instructions = PROMPT_TEMPLATE.replace("__SUBPAGE_NOTE__", subpage_note)
         return f"""URL: {url}
 Project: {project}
 Page type: {page_type}
 Level: {level}
-{parent_section}
+
 CONTENT ANALYSIS:
 {content_summary}
 
@@ -159,10 +49,43 @@ PAGE TEXT (first {text_limit} chars):
 {page_text[:text_limit]}
 
 EXISTING SCHEMAS:
-{existing_schemas[:6000]}
-{faq_section}
+{existing_schemas[:3000]}
 
-{instructions}"""
+STEP 1 - Analyze existing schemas:
+Analyze the schemas above carefully for:
+- Errors and wrong types
+- Missing required properties
+- Duplicate schemas
+- Wrong schema type for this page type
+If no existing schemas were provided, state "No existing schemas were provided."
+
+STEP 2 - Cross-page awareness:
+- Level 1 (home page): implement WebSite, Organization, WebPage
+- Any other level: do NOT implement Organization or WebSite
+- Sub-page status for this URL: {subpage_note}
+- If sub-page: reference the parent entity using its @id - do NOT redefine the parent entity schema
+
+STEP 3 - Produce the report as a JSON array of Notion blocks covering:
+1. Executive Summary (heading_2 + paragraph) - schema health score (Poor/Fair/Good/Excellent), what was found, what is missing, urgent issues with warning emoji
+2. Schemas to Implement (heading_2 + paragraph + code block per schema)
+3. Fixes to Existing Schemas (heading_2 + paragraph + code block)
+4. Additional Notes (heading_2 + paragraph) - CMS notes, Yoast conflicts
+
+Rules:
+- Return a raw JSON array only, no surrounding text
+- All report text in English
+- Schema JSON-LD field values must match the actual page language
+- Before each code block, state explicitly: NEW ADDITION or REPLACEMENT FOR EXISTING [type] SCHEMA
+- Never invent or estimate property values - use: // REQUIRED: fill in actual value
+- Never write field values not explicitly present on the page
+- Never add starRating or aggregateRating unless confirmed on the page
+- Never include sameAs: [] - if social URLs unknown, omit sameAs entirely
+- Never recommend SearchAction unless a search input is confirmed on the page
+- Do NOT add FAQPage unless real Q&A content exists on the page
+- Do NOT redefine Yoast-managed schemas (WebPage, BreadcrumbList, WebSite) - only flag issues
+- Do NOT add Organization or WebSite on non-homepage pages
+- For FAQPage with more than 3 questions: write a summary only, no full schema
+- Each code block must not exceed 1900 characters - split if needed"""
 
     def call_claude(prompt_text):
         message = client.messages.create(
@@ -177,31 +100,55 @@ EXISTING SCHEMAS:
             raw = raw.rsplit("```", 1)[0].strip()
         return raw
 
-    # First attempt
+    # First attempt — full page text
     raw = call_claude(build_prompt(2000))
-    blocks = safe_parse(raw)
-    if blocks is not None:
-        return {
-            "blocks": blocks,
-            "used_retry": False,
-            "recommended_schemas": extract_recommended_schemas(blocks)
-        }
-    print(f"JSON parse error (last 300 chars): ...{raw[-300:]}")
-    print("Retrying with simpler prompt...")
+    try:
+        blocks = json.loads(raw)
+        rec_types, rec_ids = extract_recommended_schemas(blocks)
+        return {"blocks": blocks, "used_retry": False, "recommended_schemas": rec_types, "recommended_ids": rec_ids}
+    except json.JSONDecodeError as e:
+        print(f"JSON parse error: {e}")
+        print(f"Raw response (last 300 chars): ...{raw[-300:]}")
+        print("Retrying with simpler prompt...")
 
-    # Retry
+    # Retry — shorter page text
     raw = call_claude(build_prompt(500))
-    blocks = safe_parse(raw)
-    if blocks is not None:
-        return {
-            "blocks": blocks,
-            "used_retry": True,
-            "recommended_schemas": extract_recommended_schemas(blocks)
-        }
-    raise ValueError(f"Both attempts failed. Last 300 chars: ...{raw[-300:]}")
+    try:
+        blocks = json.loads(raw)
+        rec_types, rec_ids = extract_recommended_schemas(blocks)
+        return {"blocks": blocks, "used_retry": True, "recommended_schemas": rec_types, "recommended_ids": rec_ids}
+    except json.JSONDecodeError as e:
+        print(f"Retry also failed: {e}")
+        raise
+def extract_recommended_schemas(blocks):
+    """Extract @type and @id values from Claude's recommended schema code blocks.
+    Used to feed the QA report with what was RECOMMENDED, not what exists on the live site.
+    """
+    import re
+    types_found = []
+    ids_found = []
+    for block in blocks:
+        if block.get("type") == "code":
+            rich_text = block.get("code", {}).get("rich_text", [])
+            content = "".join(
+                rt.get("text", {}).get("content", "")
+                for rt in rich_text
+                if isinstance(rt, dict)
+            )
+            for match in re.findall(r'"@type"\s*:\s*"([^"]+)"', content):
+                if match not in types_found:
+                    types_found.append(match)
+            for match in re.findall(r'"@id"\s*:\s*"([^"]+)"', content):
+                if match not in ids_found:
+                    ids_found.append(match)
+    return types_found, ids_found
 
 
 def generate_executive_summary(page_summaries, project):
+    """
+    page_summaries: list of dicts with url, level, page_type, used_retry, schemas_found, content_analysis
+    Returns: JSON array of Notion blocks (Hebrew executive summary)
+    """
     pages_text = ""
     retry_pages = [p["url"] for p in page_summaries if p.get("used_retry")]
 
@@ -214,6 +161,7 @@ def generate_executive_summary(page_summaries, project):
   סוג: {p['page_type']} | רמה: {p['level']}
   H1: {ca.get('h1') or 'לא נמצא'}
   סכמות קיימות: {schemas}
+  תמונות: {ca.get('images', {}).get('total', 0)} סה"כ, {ca.get('images', {}).get('missing_alt', 0)} ללא alt
   FAQ: {'כן' if ca.get('faq_patterns') else 'לא'}
 """
 
@@ -236,18 +184,17 @@ Structure:
 3. heading_2: "ממצאים לפי דף"
 4. bulleted_list_item per page: שם הדף + מה נמצא + מה חסר (שורה אחת קצרה)
 5. heading_2: "⚠️ בעיות דחופות"
-6. bulleted_list_item: בעיות קריטיות מכלל הדפים (ללא נושאי נגישות)
+6. bulleted_list_item: בעיות קריטיות מכלל הדפים
 7. heading_2: "סדר עדיפויות מומלץ"
 8. numbered_list_item: משימות לפי סדר חשיבות
 9. heading_2: "הערות כלליות"
-10. paragraph: המלצות כלליות (CMS, Yoast)
+10. paragraph: המלצות כלליות (CMS, Yoast, נגישות)
 {f'11. callout (orange_background, icon ⚠️): "דפים שנותחו חלקית (retry): {chr(44).join(retry_pages)}"' if retry_pages else ""}
 
 Rules:
 - All text in Hebrew
 - Return raw JSON array of Notion blocks only, no surrounding text
 - Be specific and actionable
-- Do NOT mention accessibility, alt text, WCAG, or screen readers
 - Do not invent data not present in the summary above"""
 
     message = client.messages.create(
@@ -260,62 +207,61 @@ Rules:
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]
         raw = raw.rsplit("```", 1)[0].strip()
-    result = safe_parse(raw)
-    if result is not None:
-        return result
-    raise ValueError(f"Executive summary parse failed. Last 300: ...{raw[-300:]}")
-
-
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as e:
+        print(f"Executive summary JSON parse error: {e}")
+        print(f"Raw (last 300): ...{raw[-300:]}")
+        raise
 def generate_qa_report(page_summaries, project):
+    """
+    Cross-page QA: checks Claude's RECOMMENDED schemas and @ids (not the live site).
+    Returns: JSON array of Notion blocks (Hebrew QA report)
+    """
     pages_data = ""
     for p in page_summaries:
-        ca = p.get("content_analysis", {})
-        schemas = ", ".join(p.get("schemas_found", [])) or "None"
-        ids = "\n    ".join(p.get("schema_ids", [])) or "None"
+        rec_types = ", ".join(p.get("recommended_schemas", [])) or "לא חולצו"
+        rec_ids = "\n    ".join(p.get("recommended_ids", [])) or "לא חולצו"
         retry_note = " ⚠️ [נותח חלקית]" if p.get("used_retry") else ""
         pages_data += f"""
 דף: {p['url']}{retry_note}
   סוג: {p['page_type']} | רמה: {p['level']}
-  H1: {ca.get('h1') or '❌ חסר'}
-  @types קיימים בדף: {schemas}
-  @ids קיימים בדף (אלו ה-@ids שנמצאו בקוד הנוכחי, לא בהכרח מה שהומלץ):
-    {ids}
+  @types שהומלצו בדוח:
+    {rec_types}
+  @ids שהומלצו בדוח:
+    {rec_ids}
 """
-
     prompt = f"""Project: {project}
 Total pages: {len(page_summaries)}
-PAGES DATA:
+CRITICAL CONTEXT: The data below contains the schemas and @ids that were RECOMMENDED
+by the analysis reports — NOT what currently exists on the live site.
+Your job is to cross-check these RECOMMENDATIONS for consistency across pages.
+PAGES DATA (recommended schemas per page):
 {pages_data}
-
-You are a Schema.org QA auditor. Perform a cross-page quality check.
+You are a Schema.org QA auditor. Perform a cross-page quality check on the RECOMMENDED schemas.
 Return a JSON array of Hebrew Notion blocks.
-
-IMPORTANT: The @ids listed above are from the EXISTING page code (current state before our recommendations).
-When checking @id consistency, note which @ids exist currently and flag issues accordingly.
-If a schema type is marked for replacement in the analysis (e.g. LocalBusiness → Hotel),
-do NOT say it is "correctly defined" — say "קיים [type] — מסומן להחלפה בדוח".
-
 Structure:
 1. heading_2: "דוח QA — {project}"
-2. paragraph: תקציר ממצאי ה-QA
-3. heading_2: "סטטוס עיבוד"
-4. bulleted_list_item per page: סטטוס עיבוד + האם יש H1 + כמה סכמות נמצאו
-5. heading_2: "בדיקת שרשור @id"
-6. bulleted_list_item per finding:
-   - בדוק עקביות @ids בין הדפים (האם #org זהה? האם #hotel עקבי?)
-   - בדוק slash/no-slash: /nucha#hotel לעומת /nucha/#hotel
-   - לגבי סכמות שמסומנות להחלפה: ציין "קיים #localbusiness — מסומן להחלפה ב-Hotel בדוח"
-   - אם אין בעיות: "לא נמצאו אי-עקביות"
-7. heading_2: "פערים שלא טופלו"
-8. bulleted_list_item: ממצאים שלא קיבלו מענה בדוחות. אם אין: "אין פערים — כל הממצאים טופלו"
-
+2. paragraph: תקציר ממצאי ה-QA (כמה בעיות עקביות נמצאו, מה המצב הכולל בין הדפים)
+3. heading_2: "בדיקת שרשור @id"
+4. bulleted_list_item per issue:
+   - האם @id של Organization מוגדר בדף הבית ומוזכר בצורה זהה בדפי הילד?
+   - האם @id של Hotel עקבי? בדוק slash/no-slash (למשל /nucha#hotel לעומת /nucha/#hotel)
+   - האם יש @id שמוגדר בדף אחד אבל מוזכר בצורה שונה בדף אחר?
+   - ציין @id בעייתיים בצורה מדויקת עם הערך המלא. אם אין בעיות: כתוב "לא נמצאו אי-עקביות — השרשור תקין"
+5. heading_2: "סכמות לפי דף — בדיקת כיסוי"
+6. bulleted_list_item per page: שם הדף + הסכמות שהומלצו + האם הכיסוי הגיוני לסוג הדף?
+7. heading_2: "⚠️ דפים שנותחו חלקית"
+8. bulleted_list_item: דפים עם retry + המלצה לבדיקה ידנית. אם אין: paragraph: "כל הדפים נותחו בהצלחה"
+9. heading_2: "✅ צ'קליסט לפני פרסום"
+10. to_do blocks: פעולות ספציפיות לפני עליה לאוויר — לפי הממצאים למעלה
 Rules:
 - All text in Hebrew
 - Return raw JSON array of Notion blocks only
-- Do NOT mention accessibility, alt text, or WCAG
-- Be precise: mention specific @id values, URLs, schema types
-- Do not invent data not in the pages data above"""
-
+- to_do blocks: type is "to_do", checked is false
+- Be precise: mention specific @id values, schema types, page URLs
+- Base everything ONLY on the recommended data above — do not invent
+- The QA checks consistency between pages, not whether schemas are already implemented"""
     message = client.messages.create(
         model="claude-sonnet-4-5",
         max_tokens=6000,
@@ -326,7 +272,9 @@ Rules:
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]
         raw = raw.rsplit("```", 1)[0].strip()
-    result = safe_parse(raw)
-    if result is not None:
-        return result
-    raise ValueError(f"QA report parse failed. Last 300: ...{raw[-300:]}")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as e:
+        print(f"QA report JSON parse error: {e}")
+        print(f"Raw (last 300): ...{raw[-300:]}")
+        raise
