@@ -27,18 +27,23 @@ def code(text, language="json"):
 
 
 def get_or_create_project_page(project_name):
-    """Find existing project page or create a new one under PARENT_PAGE_ID."""
-    results = notion.search(query=project_name, filter={"property": "object", "value": "page"}).get("results", [])
+    """Find existing project page or create a new one under PARENT_PAGE_ID.
+    Page title includes the current date: 'Project Name — YYYY-MM-DD'
+    """
+    from datetime import datetime
+    date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    full_title = f"{project_name} — {date_str}"
+    results = notion.search(query=full_title, filter={"property": "object", "value": "page"}).get("results", [])
     for page in results:
         title = page.get("properties", {}).get("title", {}).get("title", [])
-        if title and title[0]["text"]["content"] == project_name:
+        if title and title[0]["text"]["content"] == full_title:
             parent = page.get("parent", {})
             if parent.get("page_id") == PARENT_PAGE_ID:
                 return page["id"]
     # Not found — create it
     response = notion.pages.create(
         parent={"page_id": PARENT_PAGE_ID},
-        properties={"title": [{"text": {"content": project_name}}]}
+        properties={"title": [{"text": {"content": full_title}}]}
     )
     return response["id"]
 
