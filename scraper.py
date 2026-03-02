@@ -7,6 +7,19 @@ from playwright.sync_api import sync_playwright
 
 
 def fetch_html(url):
+    # Try cloudscraper first — handles Cloudflare and most sites
+    try:
+        import cloudscraper
+        scraper = cloudscraper.create_scraper()
+        response = scraper.get(url, timeout=30)
+        response.encoding = response.apparent_encoding
+        html = response.text
+        if len(html) > 1000 and "Enable JavaScript" not in html:
+            return html
+    except Exception:
+        pass
+
+    # Fallback to Playwright — for pure JS/SPA sites
     from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
         browser = p.chromium.launch(args=[
