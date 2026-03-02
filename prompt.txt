@@ -1,3 +1,10 @@
+IMPORTANT — BLOCKED PAGE DETECTION:
+If the page content contains "Enable JavaScript and cookies to continue", "cf-browser-verification", or the total page text is under 300 characters:
+- In Executive Summary: open with "⚠️ PAGE BLOCKED — This page is protected by Cloudflare or a JavaScript gate. Content and schemas could not be extracted."
+- Do NOT write "no schemas found" — write "schemas could not be verified due to page block"
+- Do NOT list missing schemas as critical issues — they may exist but are hidden behind the block
+- Still provide schema recommendations based on the URL, page type, and level alone
+
 STEP 1 - Detect schema manager:
 Examine the existing schemas and identify what is generating them:
 - If schemas appear inside an @graph array → managed by an SEO plugin or platform
