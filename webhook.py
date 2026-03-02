@@ -2,6 +2,7 @@ import os
 import traceback
 import json
 from flask import Flask, request, jsonify
+from notion_client import Client
 from scraper import scan_page
 from claude_agent import (
     analyze_with_scan,
@@ -16,8 +17,24 @@ from notion_writer import (
     write_executive_summary,
     write_qa_report
 )
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
+notion = Client(auth=os.getenv("NOTION_API_KEY"))
+
+
+def is_page_blocked(scan):
+    """Returns True if the page is blocked by Cloudflare or a JS gate."""
+    pt = scan.get("page_text", {})
+    text = pt.get("text") or ""
+    word_count = pt.get("word_count", 0)
+    return (
+        word_count < 50 or
+        "Enable JavaScript" in text or
+        "cf-browser-verification" in text
+    )
 
 
 @app.route("/webhook", methods=["POST"])
@@ -60,6 +77,21 @@ def webhook():
 
             print(f"  Scanning level {level}: {url}")
             scan = scan_page(url)
+
+            # If homepage is blocked — abort entire run, write notice to project page
+            if str(level) == "1" and is_page_blocked(scan):
+                print(f"  ⚠️ Homepage blocked — aborting run")
+                blocked_blocks = [{
+                    "object": "block",
+                    "type": "callout",
+                    "callout": {
+                        "rich_text": [{"type": "text", "text": {"content": f"⚠️ דף הבית ({url}) חסום על ידי Cloudflare או הגנת JavaScript. לא ניתן לנתח את האתר. יש לפתור את חסימת הסריקה לפני הפקת דוחות."}}],
+                        "icon": {"emoji": "🚫"},
+                        "color": "red_background"
+                    }
+                }]
+                notion.blocks.children.append(project_page_id, children=blocked_blocks)
+                return jsonify({"status": "blocked", "project": project, "url": url})
 
             print(f"  Analyzing: {url}")
             result = analyze_with_scan(
@@ -128,4 +160,5 @@ def webhook():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
