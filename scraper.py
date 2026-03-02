@@ -8,11 +8,16 @@ from playwright.sync_api import sync_playwright
 
 def fetch_html(url):
     from playwright.sync_api import sync_playwright
-    from playwright_stealth import stealth_sync
     with sync_playwright() as p:
-        browser = p.chromium.launch(args=["--no-sandbox", "--disable-setuid-sandbox"])
-        page = browser.new_page()
-        stealth_sync(page)
+        browser = p.chromium.launch(args=[
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-blink-features=AutomationControlled"
+        ])
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+        page = context.new_page()
         page.goto(url, wait_until="domcontentloaded", timeout=30000)
         html = page.content()
         browser.close()
