@@ -7,11 +7,16 @@ from playwright.sync_api import sync_playwright
 
 
 def fetch_html(url):
-    import requests
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; SchemaAuditBot/1.0)"}
-    response = requests.get(url, headers=headers, timeout=30)
-    response.encoding = response.apparent_encoding
-    return response.text
+    from playwright.sync_api import sync_playwright
+    from playwright_stealth import stealth_sync
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=["--no-sandbox", "--disable-setuid-sandbox"])
+        page = browser.new_page()
+        stealth_sync(page)
+        page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        html = page.content()
+        browser.close()
+        return html
 
 
 def extract_structured_data(html, url):
