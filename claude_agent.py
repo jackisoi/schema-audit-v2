@@ -40,6 +40,13 @@ KNOWN_SCHEMA_TYPES = {
     "HowTo", "Recipe", "Review", "AggregateRating", "PostalAddress",
     "GeoCoordinates", "LodgingBusiness", "FoodEstablishment", "Offer"
 }
+# Sub-types that appear nested inside schemas — not top-level page schemas
+NESTED_SCHEMA_TYPES = {
+    "Country", "OfferCatalog", "Offer", "Question", "Answer",
+    "PostalAddress", "GeoCoordinates", "ContactPoint", "OpeningHoursSpecification",
+    "MonetaryAmount", "PropertyValue", "ListItem", "ItemList",
+    "EntryPoint", "SearchAction", "ReadAction", "ImageObject"
+}
 def extract_recommended_schemas(blocks):
     """Extract @type and @id values from Claude's recommended schema blocks.
     Scans ALL block types (not just code) for explicit @type/@id patterns.
@@ -79,6 +86,8 @@ def extract_recommended_schemas(blocks):
             for schema_type in KNOWN_SCHEMA_TYPES:
                 if schema_type in content and schema_type not in types_found:
                     types_found.append(schema_type)
+    # Filter out nested/sub-types — keep only top-level page schema types
+    types_found = [t for t in types_found if t not in NESTED_SCHEMA_TYPES]
     print(f"    [extract_recommended_schemas] types: {types_found} | ids count: {len(ids_found)}")
     return types_found, ids_found
 
@@ -319,48 +328,66 @@ def generate_qa_report(page_summaries, project):
     """
     pages_data = ""
     for p in page_summaries:
-        rec_types = ", ".join(p.get("recommended_schemas", [])) or "לא חולצו"
-        rec_ids = "\n    ".join(p.get("recommended_ids", [])) or "לא חולצו"
-        retry_note = " ⚠️ [נותח חלקית]" if p.get("used_retry") else ""
+        rec_types = ", ".join(p.get("recommended_schemas", [])) or "none extracted"
+        rec_ids = "\n    ".join(p.get("recommended_ids", [])) or "none extracted"
+        retry_note = " ⚠️ [partial analysis]" if p.get("used_retry") else ""
         pages_data += f"""
-דף: {p['url']}{retry_note}
-  סוג: {p['page_type']} | רמה: {p['level']}
-  @types שהומלצו בדוח:
+Page: {p['url']}{retry_note}
+  Type: {p['page_type']} | Level: {p['level']}
+  Recommended @types:
     {rec_types}
-  @ids שהומלצו בדוח:
+  Recommended @ids:
     {rec_ids}
 """
 
     prompt = f"""Project: {project}
 Total pages: {len(page_summaries)}
-CRITICAL CONTEXT: The data below contains the schemas and @ids that were RECOMMENDED
-by the analysis reports — NOT what currently exists on the live site.
-Your job is to cross-check these RECOMMENDATIONS for consistency across pages.
-PAGES DATA (recommended schemas per page):
+CONTEXT:
+Each page has already received a dedicated Schema Report with specific fix instructions.
+ASSUME all those recommendations will be fully implemented by the client.
+Your job is ONLY to identify cross-page consistency issues that individual reports cannot catch.
+DO NOT re-flag any issue that was already addressed in a per-page report.
+PAGES DATA (recommended schemas and @ids per page, after implementation):
 {pages_data}
-You are a Schema.org QA auditor. Perform a cross-page quality check on the RECOMMENDED schemas.
-Return a JSON array of Hebrew Notion blocks.
+You are a Schema.org QA auditor. Flag ONLY issues that:
+1. Span multiple pages (e.g. same entity uses different @id on different pages)
+2. Could not have been caught by a single-page review
+3. Were NOT already covered by individual page recommendations
+Return a JSON array of English Notion blocks.
 Structure:
-1. heading_2: "דוח QA — {project}"
-2. paragraph: תקציר ממצאי ה-QA
-3. heading_2: "בדיקת שרשור @id"
-4. bulleted_list_item per issue:
-   - האם @id של Organization עקבי בין הדפים?
-   - בדוק slash/no-slash
-   - אם אין בעיות: "לא נמצאו אי-עקביות"
-5. heading_2: "סכמות לפי דף — בדיקת כיסוי"
-6. bulleted_list_item per page: שם + סכמות שהומלצו + האם הכיסוי הגיוני?
-7. heading_2: "⚠️ דפים שנותחו חלקית"
-8. bulleted_list_item or paragraph "כל הדפים נותחו בהצלחה"
-9. heading_2: "✅ צ'קליסט לפני פרסום"
-10. to_do blocks: פעולות לפני עלייה לאוויר
+1. heading_2: "QA Report — {project}"
+2. paragraph: brief summary of unresolved cross-page issues only
+3. heading_2: "@id Consistency"
+   - Check that the same entity uses the same @id across all pages
+   - Check slash/no-slash consistency in @ids
+   - Check that subpages correctly reference parent @ids
+   - If no issues: single bulleted_list_item: "No @id inconsistencies found"
+4. heading_2: "Cross-Page Issues"
+   - Only issues that span multiple pages and were not addressed per-page
+   - If no issues: single bulleted_list_item: "No cross-page issues found"
+4b. heading_2: "Uncertain — Needs Review"
+   - Issues you are unsure whether they were already covered in per-page reports
+   - For each: briefly explain what the issue is AND why you are uncertain
+   - If nothing uncertain: omit this section entirely
+5. heading_2: "Partially Analyzed Pages"
+   - Only include this section if any page used retry mode
+   - Otherwise: omit this section entirely
+6. heading_2: "Pre-Launch Checklist"
+   - to_do blocks: ONLY validation steps not covered by individual reports
+   - Focus on: cross-page validation, Google Rich Results Test after full deployment
+ABSOLUTE FILTER — apply this test to EVERY issue before including it:
+"Is there a recommendation in ANY individual page report that, if implemented, would resolve this issue?"
+If YES → exclude it entirely. Do not mention it. Do not summarize it. Do not reference it.
+The QA report exists ONLY for issues with NO corresponding recommendation in any page report.
 Rules:
-- All text in Hebrew
+- All text in English
 - Return raw JSON array of Notion blocks only
 - to_do blocks: type is \"to_do\", checked is false
-- Be precise: mention specific @id values, schema types, page URLs
-- Base everything ONLY on the recommended data above
-- The QA checks consistency between pages, not whether schemas exist on live site"""
+- Be precise: reference specific @id values and page URLs
+- DO NOT flag missing schemas — those are handled in individual page reports
+- DO NOT repeat any recommendation from individual page reports
+- ONLY flag genuine cross-page inconsistencies
+- When in doubt whether an issue was already covered — include it under a separate heading_2: "Uncertain — Needs Review", with a brief note explaining why it may or may not be redundant with per-page reports"""
 
     message = client.messages.create(
         model="claude-sonnet-4-5",
