@@ -1,3 +1,4 @@
+# v1.6 — webhook secret auth
 import os
 import traceback
 import json
