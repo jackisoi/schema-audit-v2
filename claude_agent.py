@@ -14,6 +14,7 @@ client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 SYSTEM_PROMPT = "You are a Schema.org structured data expert and a JSON API. Return only a raw JSON array of Notion blocks. No markdown fences, no surrounding text."
 
+
 def extract_schemas_from_json_ld(json_ld):
     """Extract schema @types and @ids from json-ld blocks."""
     types = set()
@@ -30,6 +31,7 @@ def extract_schemas_from_json_ld(json_ld):
             if i:
                 ids.append(i)
     return sorted(types), ids
+
 
 def extract_recommended_schemas(blocks):
     """Extract @type and @id values from Claude's recommended schema code blocks.
@@ -53,6 +55,7 @@ def extract_recommended_schemas(blocks):
                     ids_found.append(match)
     return types_found, ids_found
 
+
 def extract_faq_summary(json_ld):
     """Extract FAQ questions/answers as compact readable list for analysis."""
     faqs = []
@@ -66,6 +69,7 @@ def extract_faq_summary(json_ld):
                     answer = answer_obj.get("text", "") if isinstance(answer_obj, dict) else ""
                     faqs.append(f"Q{i}: {question[:120]}\nA{i}: {answer[:120]}")
     return faqs
+
 
 def summarize_existing_schemas(json_ld):
     """Return existing schemas with FAQPage mainEntity replaced by a count summary."""
@@ -88,6 +92,7 @@ def summarize_existing_schemas(json_ld):
         summarized.append(block)
     return summarized
 
+
 def safe_parse(raw_text):
     """Try json.loads first, then json_repair as fallback."""
     try:
@@ -99,6 +104,7 @@ def safe_parse(raw_text):
             return json.loads(repaired)
         except Exception:
             return None
+
 
 def analyze_with_scan(scan_result, level, page_type, project, parent_context=None):
     url = scan_result["url"]
@@ -117,13 +123,21 @@ def analyze_with_scan(scan_result, level, page_type, project, parent_context=Non
         faq_section = f"\nFAQ CONTENT ({len(faq_items)} items — check for swapped Q/A):\n"
         faq_section += "\n".join(faq_items)
 
-    content_summary = f"""H1: {ca.get('h1') or 'Not found'}
-H2s: {', '.join(ca.get('h2s', [])[:5]) or 'None'}
-Video: {'Yes' if ca.get('video') else 'No'}
-Forms: {ca.get('forms') or 'None'}
-FAQ patterns: {'Yes' if ca.get('faq_patterns') else 'No'}
-Phone: {ca.get('contact_info', {}).get('phone') or 'Not found'}
-Email: {ca.get('contact_info', {}).get('email') or 'Not found'}"""
+    h1 = ca.get('h1') or 'Not found'
+    h2s = ', '.join(ca.get('h2s', [])[:5]) or 'None'
+    video = 'Yes' if ca.get('video') else 'No'
+    forms = ca.get('forms') or 'None'
+    faq_flag = 'Yes' if ca.get('faq_patterns') else 'No'
+    phone = ca.get('contact_info', {}).get('phone') or 'Not found'
+    email = ca.get('contact_info', {}).get('email') or 'Not found'
+
+    content_summary = f"""H1: {h1}
+H2s: {h2s}
+Video: {video}
+Forms: {forms}
+FAQ patterns: {faq_flag}
+Phone: {phone}
+Email: {email}"""
 
     page_text = pt.get("text") or ""
 
@@ -200,6 +214,7 @@ EXISTING SCHEMAS:
         }
     raise ValueError(f"Both attempts failed. Last 300 chars: ...{raw[-300:]}")
 
+
 def generate_executive_summary(page_summaries, project):
     pages_text = ""
     retry_pages = [p["url"] for p in page_summaries if p.get("used_retry")]
@@ -207,18 +222,21 @@ def generate_executive_summary(page_summaries, project):
     for p in page_summaries:
         ca = p.get("content_analysis", {})
         schemas = ", ".join(p.get("schemas_found", [])) or "None"
-        retry_note = " \u26a0\ufe0f [\u05e0\u05d5\u05ea\u05d7 \u05d7\u05dc\u05e7\u05d9\u05ea - retry]" if p.get("used_retry") else ""
+        retry_note = " ⚠️ [נותח חלקית - retry]" if p.get("used_retry") else ""
+        h1_val = ca.get('h1') or 'לא נמצא'
+        faq_val = 'כן' if ca.get('faq_patterns') else 'לא'
         pages_text += f"""
-\u05d3\u05e3: {p['url']}{retry_note}
-  \u05e1\u05d5\u05d2: {p['page_type']} | \u05e8\u05de\u05d4: {p['level']}
-  H1: {ca.get('h1') or '\u05dc\u05d0 \u05e0\u05de\u05e6\u05d0'}
-  \u05e1\u05db\u05de\u05d5\u05ea \u05e7\u05d9\u05d9\u05de\u05d5\u05ea: {schemas}
-  FAQ: {'\u05db\u05df' if ca.get('faq_patterns') else '\u05dc\u05d0'}
+דף: {p['url']}{retry_note}
+  סוג: {p['page_type']} | רמה: {p['level']}
+  H1: {h1_val}
+  סכמות קיימות: {schemas}
+  FAQ: {faq_val}
 """
 
     retry_warning = ""
     if retry_pages:
-        retry_warning = "\n\u26a0\ufe0f \u05d4\u05e2\u05e8\u05d4: \u05d4\u05d3\u05e4\u05d9\u05dd \u05d4\u05d1\u05d0\u05d9\u05dd \u05e0\u05d5\u05ea\u05d7\u05d5 \u05e2\u05dd \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05dc\u05e7\u05d9\u05d9\u05dd (retry mode):\n" + "\n".join(retry_pages)
+        retry_callout_line = ", ".join(retry_pages)
+        retry_warning = f"\n⚠️ הערה: הדפים הבאים נותחו עם נתונים חלקיים (retry mode):\n{retry_callout_line}"
 
     prompt = f"""Project: {project}
 Total pages analyzed: {len(page_summaries)}
@@ -230,16 +248,16 @@ PAGES SUMMARY:
 Write a comprehensive executive summary in Hebrew as a JSON array of Notion blocks.
 
 Structure:
-1. heading_2: "\u05e1\u05d9\u05db\u05d5\u05dd \u05de\u05e0\u05d4\u05dc\u05d9\u05dd \u2014 {project}"
-2. paragraph: \u05e6\u05d9\u05d5\u05df \u05d1\u05e8\u05d9\u05d0\u05d5\u05ea \u05db\u05d5\u05dc\u05dc (Poor / Fair / Good / Excellent) + \u05d4\u05e1\u05d1\u05e8 \u05e7\u05e6\u05e8
-3. heading_2: "\u05de\u05de\u05e6\u05d0\u05d9\u05dd \u05dc\u05e4\u05d9 \u05d3\u05e3"
-4. bulleted_list_item per page: \u05e9\u05dd \u05d4\u05d3\u05e3 + \u05de\u05d4 \u05e0\u05de\u05e6\u05d0 + \u05de\u05d4 \u05d7\u05e1\u05e8
-5. heading_2: "\u26a0\ufe0f \u05d1\u05e2\u05d9\u05d5\u05ea \u05d3\u05d7\u05d5\u05e4\u05d5\u05ea"
-6. bulleted_list_item: \u05d1\u05e2\u05d9\u05d5\u05ea \u05e7\u05e8\u05d9\u05d8\u05d9\u05d5\u05ea (\u05dc\u05dc\u05d0 \u05e0\u05d2\u05d9\u05e9\u05d5\u05ea)
-7. heading_2: "\u05e1\u05d3\u05e8 \u05e2\u05d3\u05d9\u05e4\u05d5\u05d9\u05d5\u05ea \u05de\u05d5\u05de\u05dc\u05e5"
-8. numbered_list_item: \u05de\u05e9\u05d9\u05de\u05d5\u05ea \u05dc\u05e4\u05d9 \u05e1\u05d3\u05e8 \u05d7\u05e9\u05d9\u05d1\u05d5\u05ea
-9. heading_2: "\u05d4\u05e2\u05e8\u05d5\u05ea \u05db\u05dc\u05dc\u05d9\u05d5\u05ea"
-10. paragraph: \u05d4\u05de\u05dc\u05e6\u05d5\u05ea \u05db\u05dc\u05dc\u05d9\u05d5\u05ea (CMS, Yoast)
+1. heading_2: "סיכום מנהלים — {project}"
+2. paragraph: ציון בריאות כולל (Poor / Fair / Good / Excellent) + הסבר קצר
+3. heading_2: "ממצאים לפי דף"
+4. bulleted_list_item per page: שם הדף + מה נמצא + מה חסר
+5. heading_2: "⚠️ בעיות דחופות"
+6. bulleted_list_item: בעיות קריטיות (ללא נגישות)
+7. heading_2: "סדר עדיפויות מומלץ"
+8. numbered_list_item: משימות לפי סדר חשיבות
+9. heading_2: "הערות כלליות"
+10. paragraph: המלצות כלליות (CMS, Yoast)
 
 Rules:
 - All text in Hebrew
@@ -263,21 +281,23 @@ Rules:
         return result
     raise ValueError(f"Executive summary parse failed. Last 300: ...{raw[-300:]}")
 
+
 def generate_qa_report(page_summaries, project):
     """
     Cross-page QA: checks Claude's RECOMMENDED schemas and @ids (not the live site).
     """
     pages_data = ""
     for p in page_summaries:
-        rec_types = ", ".join(p.get("recommended_schemas", [])) or "\u05dc\u05d0 \u05d7\u05d5\u05dc\u05e6\u05d5"
-        rec_ids = "\n    ".join(p.get("recommended_ids", [])) or "\u05dc\u05d0 \u05d7\u05d5\u05dc\u05e6\u05d5"
-        retry_note = " \u26a0\ufe0f [\u05e0\u05d5\u05ea\u05d7 \u05d7\u05dc\u05e7\u05d9\u05ea]" if p.get("used_retry") else ""
+        rec_types = ", ".join(p.get("recommended_schemas", [])) or "לא חולצו"
+        rec_ids_list = p.get("recommended_ids", [])
+        rec_ids = "\n    ".join(rec_ids_list) if rec_ids_list else "לא חולצו"
+        retry_note = " ⚠️ [נותח חלקית]" if p.get("used_retry") else ""
         pages_data += f"""
-\u05d3\u05e3: {p['url']}{retry_note}
-  \u05e1\u05d5\u05d2: {p['page_type']} | \u05e8\u05de\u05d4: {p['level']}
-  @types \u05e9\u05d4\u05d5\u05de\u05dc\u05e6\u05d5 \u05d1\u05d3\u05d5\u05d7:
+דף: {p['url']}{retry_note}
+  סוג: {p['page_type']} | רמה: {p['level']}
+  @types שהומלצו בדוח:
     {rec_types}
-  @ids \u05e9\u05d4\u05d5\u05de\u05dc\u05e6\u05d5 \u05d1\u05d3\u05d5\u05d7:
+  @ids שהומלצו בדוח:
     {rec_ids}
 """
 
@@ -291,23 +311,23 @@ PAGES DATA (recommended schemas per page):
 You are a Schema.org QA auditor. Perform a cross-page quality check on the RECOMMENDED schemas.
 Return a JSON array of Hebrew Notion blocks.
 Structure:
-1. heading_2: "\u05d3\u05d5\u05d7 QA \u2014 {project}"
-2. paragraph: \u05ea\u05e7\u05e6\u05d9\u05e8 \u05de\u05de\u05e6\u05d0\u05d9 \u05d4-QA
-3. heading_2: "\u05d1\u05d3\u05d9\u05e7\u05ea \u05e9\u05e8\u05e9\u05d5\u05e8 @id"
+1. heading_2: "דוח QA — {project}"
+2. paragraph: תקציר ממצאי ה-QA
+3. heading_2: "בדיקת שרשור @id"
 4. bulleted_list_item per issue:
-   - \u05d4\u05d0\u05dd @id \u05e9\u05dc Organization \u05e2\u05e7\u05d1\u05d9 \u05d1\u05d9\u05df \u05d4\u05d3\u05e4\u05d9\u05dd?
-   - \u05d1\u05d3\u05d5\u05e7 slash/no-slash
-   - \u05d0\u05dd \u05d0\u05d9\u05df \u05d1\u05e2\u05d9\u05d5\u05ea: \"\u05dc\u05d0 \u05e0\u05de\u05e6\u05d0\u05d5 \u05d0\u05d9-\u05e2\u05e7\u05d1\u05d9\u05d5\u05ea\"
-5. heading_2: "\u05e1\u05db\u05de\u05d5\u05ea \u05dc\u05e4\u05d9 \u05d3\u05e3 \u2014 \u05d1\u05d3\u05d9\u05e7\u05ea \u05db\u05d9\u05e1\u05d5\u05d9"
-6. bulleted_list_item per page: \u05e9\u05dd + \u05e1\u05db\u05de\u05d5\u05ea \u05e9\u05d4\u05d5\u05de\u05dc\u05e6\u05d5 + \u05d4\u05d0\u05dd \u05d4\u05db\u05d9\u05e1\u05d5\u05d9 \u05d4\u05d2\u05d9\u05d5\u05e0\u05d9?
-7. heading_2: "\u26a0\ufe0f \u05d3\u05e4\u05d9\u05dd \u05e9\u05e0\u05d5\u05ea\u05d7\u05d5 \u05d7\u05dc\u05e7\u05d9\u05ea"
-8. bulleted_list_item or paragraph \"\u05db\u05dc \u05d4\u05d3\u05e4\u05d9\u05dd \u05e0\u05d5\u05ea\u05d7\u05d5 \u05d1\u05d4\u05e6\u05dc\u05d7\u05d4\"
-9. heading_2: "\u2705 \u05e6'\u05e7\u05dc\u05d9\u05e1\u05d8 \u05dc\u05e4\u05e0\u05d9 \u05e4\u05e8\u05e1\u05d5\u05dd"
-10. to_do blocks: \u05e4\u05e2\u05d5\u05dc\u05d5\u05ea \u05dc\u05e4\u05e0\u05d9 \u05e2\u05dc\u05d9\u05d9\u05d4 \u05dc\u05d0\u05d5\u05d5\u05d9\u05e8
+   - האם @id של Organization עקבי בין הדפים?
+   - בדוק slash/no-slash
+   - אם אין בעיות: "לא נמצאו אי-עקביות"
+5. heading_2: "סכמות לפי דף — בדיקת כיסוי"
+6. bulleted_list_item per page: שם + סכמות שהומלצו + האם הכיסוי הגיוני?
+7. heading_2: "⚠️ דפים שנותחו חלקית"
+8. bulleted_list_item or paragraph "כל הדפים נותחו בהצלחה"
+9. heading_2: "✅ צ'קליסט לפני פרסום"
+10. to_do blocks: פעולות לפני עלייה לאוויר
 Rules:
 - All text in Hebrew
 - Return raw JSON array of Notion blocks only
-- to_do blocks: type is \"to_do\", checked is false
+- to_do blocks: type is "to_do", checked is false
 - Be precise: mention specific @id values, schema types, page URLs
 - Base everything ONLY on the recommended data above
 - The QA checks consistency between pages, not whether schemas exist on live site"""
