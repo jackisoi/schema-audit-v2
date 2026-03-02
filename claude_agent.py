@@ -33,26 +33,53 @@ def extract_schemas_from_json_ld(json_ld):
     return sorted(types), ids
 
 
+KNOWN_SCHEMA_TYPES = {
+    "Organization", "LocalBusiness", "Hotel", "WebSite", "WebPage", "AboutPage",
+    "ContactPage", "FAQPage", "BreadcrumbList", "ImageObject", "VideoObject",
+    "Person", "Product", "Service", "Restaurant", "Event", "Article", "BlogPosting",
+    "HowTo", "Recipe", "Review", "AggregateRating", "PostalAddress",
+    "GeoCoordinates", "LodgingBusiness", "FoodEstablishment", "Offer"
+}
 def extract_recommended_schemas(blocks):
-    """Extract @type and @id values from Claude's recommended schema code blocks.
+    """Extract @type and @id values from Claude's recommended schema blocks.
+    Scans ALL block types (not just code) for explicit @type/@id patterns.
+    Falls back to known Schema.org type name matching in text when no explicit
+    patterns found (e.g. when all schemas are managed by Yoast/RankMath).
     Returns (types_found, ids_found) — used in QA report and parent context.
     """
     types_found = []
     ids_found = []
     for block in blocks:
-        if block.get("type") == "code":
-            rich_text = block.get("code", {}).get("rich_text", [])
+        block_type = block.get("type")
+        inner = block.get(block_type, {})
+        rich_text = inner.get("rich_text", [])
+        content = "".join(
+            rt.get("text", {}).get("content", "")
+            for rt in rich_text
+            if isinstance(rt, dict)
+        )
+        for match in re.findall(r'"@type"\s*:\s*"([^"]+)"', content):
+            if match not in types_found:
+                types_found.append(match)
+        for match in re.findall(r'"@id"\s*:\s*"([^"]+)"', content):
+            if match not in ids_found:
+                ids_found.append(match)
+    # Fallback: no explicit @type patterns found (all-managed page like Yoast/RankMath)
+    # Scan all text content for known Schema.org type names
+    if not types_found:
+        for block in blocks:
+            block_type = block.get("type")
+            inner = block.get(block_type, {})
+            rich_text = inner.get("rich_text", [])
             content = "".join(
                 rt.get("text", {}).get("content", "")
                 for rt in rich_text
                 if isinstance(rt, dict)
             )
-            for match in re.findall(r'"@type"\s*:\s*"([^"]+)"', content):
-                if match not in types_found:
-                    types_found.append(match)
-            for match in re.findall(r'"@id"\s*:\s*"([^"]+)"', content):
-                if match not in ids_found:
-                    ids_found.append(match)
+            for schema_type in KNOWN_SCHEMA_TYPES:
+                if schema_type in content and schema_type not in types_found:
+                    types_found.append(schema_type)
+    print(f"    [extract_recommended_schemas] types: {types_found} | ids count: {len(ids_found)}")
     return types_found, ids_found
 
 
@@ -117,27 +144,29 @@ def analyze_with_scan(scan_result, level, page_type, project, parent_context=Non
     summarized = summarize_existing_schemas(json_ld)
     existing_schemas = json.dumps(summarized, ensure_ascii=False) if summarized else "None found"
 
+    # Microdata
+    microdata = sd.get("microdata", [])
+    microdata_section = ""
+    if microdata:
+        microdata_section = f"\nMICRODATA SCHEMAS:\n{json.dumps(microdata[:5], ensure_ascii=False)[:2000]}"
+    # RDFa
+    rdfa = sd.get("rdfa", [])
+    rdfa_section = ""
+    if rdfa:
+        rdfa_section = f"\nRDFA SCHEMAS:\n{json.dumps(rdfa[:5], ensure_ascii=False)[:2000]}"
     faq_items = extract_faq_summary(json_ld)
     faq_section = ""
     if faq_items:
         faq_section = f"\nFAQ CONTENT ({len(faq_items)} items — check for swapped Q/A):\n"
         faq_section += "\n".join(faq_items)
 
-    h1 = ca.get('h1') or 'Not found'
-    h2s = ', '.join(ca.get('h2s', [])[:5]) or 'None'
-    video = 'Yes' if ca.get('video') else 'No'
-    forms = ca.get('forms') or 'None'
-    faq_flag = 'Yes' if ca.get('faq_patterns') else 'No'
-    phone = ca.get('contact_info', {}).get('phone') or 'Not found'
-    email = ca.get('contact_info', {}).get('email') or 'Not found'
-
-    content_summary = f"""H1: {h1}
-H2s: {h2s}
-Video: {video}
-Forms: {forms}
-FAQ patterns: {faq_flag}
-Phone: {phone}
-Email: {email}"""
+    content_summary = f"""H1: {ca.get('h1') or 'Not found'}
+H2s: {', '.join(ca.get('h2s', [])[:5]) or 'None'}
+Video: {'Yes' if ca.get('video') else 'No'}
+Forms: {ca.get('forms') or 'None'}
+FAQ patterns: {'Yes' if ca.get('faq_patterns') else 'No'}
+Phone: {ca.get('contact_info', {}).get('phone') or 'Not found'}
+Email: {ca.get('contact_info', {}).get('email') or 'Not found'}"""
 
     page_text = pt.get("text") or ""
 
@@ -168,8 +197,10 @@ CONTENT ANALYSIS:
 PAGE TEXT (first {text_limit} chars):
 {page_text[:text_limit]}
 
-EXISTING SCHEMAS:
+EXISTING SCHEMAS (JSON-LD):
 {existing_schemas[:6000]}
+{microdata_section}
+{rdfa_section}
 {faq_section}
 
 {instructions}"""
@@ -289,8 +320,7 @@ def generate_qa_report(page_summaries, project):
     pages_data = ""
     for p in page_summaries:
         rec_types = ", ".join(p.get("recommended_schemas", [])) or "לא חולצו"
-        rec_ids_list = p.get("recommended_ids", [])
-        rec_ids = "\n    ".join(rec_ids_list) if rec_ids_list else "לא חולצו"
+        rec_ids = "\n    ".join(p.get("recommended_ids", [])) or "לא חולצו"
         retry_note = " ⚠️ [נותח חלקית]" if p.get("used_retry") else ""
         pages_data += f"""
 דף: {p['url']}{retry_note}
@@ -327,7 +357,7 @@ Structure:
 Rules:
 - All text in Hebrew
 - Return raw JSON array of Notion blocks only
-- to_do blocks: type is "to_do", checked is false
+- to_do blocks: type is \"to_do\", checked is false
 - Be precise: mention specific @id values, schema types, page URLs
 - Base everything ONLY on the recommended data above
 - The QA checks consistency between pages, not whether schemas exist on live site"""
