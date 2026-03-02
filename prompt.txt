@@ -1,5 +1,5 @@
 IMPORTANT — BLOCKED PAGE DETECTION:
-If the page content contains "Enable JavaScript and cookies to continue", "cf-browser-verification", or the total page text is under 300 characters:
+If the page content explicitly contains the exact text "Enable JavaScript and cookies to continue", or "cf-browser-verification", or "Just a moment" together with "Cloudflare":
 - In Executive Summary: open with "⚠️ PAGE BLOCKED — This page is protected by Cloudflare or a JavaScript gate. Content and schemas could not be extracted."
 - Do NOT write "no schemas found" — write "schemas could not be verified due to page block"
 - Do NOT list missing schemas as critical issues — they may exist but are hidden behind the block
