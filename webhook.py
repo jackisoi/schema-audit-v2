@@ -29,25 +29,21 @@ def is_page_blocked(scan):
     """Returns True if the page is blocked by Cloudflare or a JS gate."""
     pt = scan.get("page_text", {})
     text = pt.get("text") or ""
-    html_text = text.lower()
     return (
-        "enable javascript and cookies" in html_text or
-        "cf-browser-verification" in html_text or
-        ("just a moment" in html_text and "cloudflare" in html_text)
+        "Enable JavaScript" in text or
+        "cf-browser-verification" in text
     )
 
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
     try:
-        # JotForm sends multipart/form-data with a 'rawRequest' field containing JSON
         raw = request.form.get("rawRequest", "{}")
         try:
             data = json.loads(raw)
         except Exception:
             data = dict(request.form)
 
-        # JotForm field names: q5_project and q6_typeA
         project = data.get("q5_project") or data.get("Project", "Unknown Project")
         urls_raw = data.get("q6_typeA") or data.get("URLs for analysis", "[]")
 
@@ -66,7 +62,6 @@ def webhook():
         results = []
         page_summaries = []
 
-        # Sort by level before processing so Level 1 always runs first
         urls_sorted = sorted(urls, key=lambda x: str(x["Level"]))
         parent_context = {}
 
@@ -78,7 +73,6 @@ def webhook():
             print(f"  Scanning level {level}: {url}")
             scan = scan_page(url)
 
-            # If homepage is blocked — abort entire run, write notice to project page
             if str(level) == "1" and is_page_blocked(scan):
                 print(f"  ⚠️ Homepage blocked — aborting run")
                 blocked_blocks = [{
@@ -101,10 +95,11 @@ def webhook():
             blocks = result["blocks"]
             used_retry = result["used_retry"]
 
-            # Store recommended schemas for child levels
+            # Store recommended schemas AND ids for child levels
             parent_context[level] = {
                 "url": url,
-                "recommended_schemas": result["recommended_schemas"]
+                "recommended_schemas": result["recommended_schemas"],
+                "recommended_ids": result["recommended_ids"]
             }
 
             notion_url = write_report_to_notion(
@@ -113,20 +108,16 @@ def webhook():
             print(f"  Done: {notion_url}")
             results.append({"url": url, "notion": notion_url})
 
-            sd = scan["structured_data"]
-            json_ld = sd.get("json-ld", [])
-            schemas_found, schema_ids = extract_schemas_from_json_ld(json_ld)
             page_summaries.append({
                 "url": url,
                 "level": level,
                 "page_type": page_type,
                 "used_retry": used_retry,
-                "schemas_found": schemas_found,
-                "schema_ids": schema_ids,
+                "recommended_schemas": result.get("recommended_schemas", []),
+                "recommended_ids": result.get("recommended_ids", []),
                 "content_analysis": scan["content_analysis"]
             })
 
-        # Generate executive summary after all pages
         print("  Generating executive summary...")
         try:
             summary_blocks = generate_executive_summary(page_summaries, project)
@@ -136,7 +127,6 @@ def webhook():
             print(f"  Executive summary failed: {e}")
             summary_url = None
 
-        # Generate QA report
         print("  Generating QA report...")
         try:
             qa_blocks = generate_qa_report(page_summaries, project)
