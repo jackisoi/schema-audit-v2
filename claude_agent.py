@@ -420,8 +420,11 @@ Page: {p['url']}{retry_note}
 Total pages: {len(page_summaries)}
 CONTEXT:
 Each page has already received a dedicated Schema Report with specific fix instructions.
-ASSUME all those recommendations will be fully implemented by the client.
-Your job is ONLY to identify cross-page consistency issues that individual reports cannot catch.
+The tool already enforced @id consistency during analysis via parent context propagation.
+Your ONLY job: check whether the recommended @ids and @types listed below contradict each other.
+If the same entity appears with a different @id or @type on two different pages — flag it.
+If the recommendations are internally consistent — nothing to report.
+DO NOT introduce any new issues, observations, or advice of any kind.
 PAGES DATA (recommended schemas and @ids per page, after implementation):
 {pages_data}
 You are a Schema.org QA auditor. Return a JSON array of English Notion blocks.
@@ -433,10 +436,9 @@ Structure — include ONLY these sections:
    - If no issues found: one bulleted_list_item: "No @id inconsistencies found" — NO other bullets in this section
    - DO NOT add context, observations, or background — if it is not a problem, do not write it at all
 
-2. heading_2: "Cross-Page Issues"
-   - List ONLY issues that span multiple pages and were not addressed per-page
-   - If no issues: single bulleted_list_item: "No cross-page issues found"
-   - DO NOT write confirmations or summaries
+2. heading_2: "Schema Type Conflicts"
+   - Flag ONLY cases where the same real-world entity is recommended as different @types on different pages (e.g., Organization on one page, LocalBusiness on another — for the same business)
+   - If no conflicts: omit this section entirely
 
 3. heading_2: "Uncertain — Needs Review"
    - ONLY include this section if there are things Claude could not determine
@@ -457,7 +459,9 @@ ABSOLUTE RULES:
 - DO NOT include pre-launch checklists, implementation advice, or testing instructions
 - DO NOT repeat any recommendation from individual page reports
 - ONLY flag genuine cross-page inconsistencies and uncertainties
-- Return raw JSON array of Notion blocks only, all text in English"""
+- Return raw JSON array of Notion blocks only, all text in English
+- DO NOT introduce any observation or issue that is not a direct contradiction between the recommended @ids or @types listed above
+- DO NOT add new recommendations or advice of any kind"""
 
     message = client.messages.create(
         model="claude-sonnet-4-5",
