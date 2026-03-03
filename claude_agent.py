@@ -4,6 +4,7 @@ import re
 import anthropic
 from urllib.parse import urlparse
 from dotenv import load_dotenv
+from schema_ref import get_or_create_schema_reference
 
 load_dotenv()
 
@@ -417,6 +418,20 @@ Page: {p['url']}{retry_note}
   Recommended @ids:
     {rec_ids}
 """
+    # Build schema reference context for QA validation
+    all_schema_types = set()
+    for p in page_summaries:
+        all_schema_types.update(p.get("recommended_schemas", []))
+    schema_ref_context = ""
+    for schema_type in sorted(all_schema_types):
+        ref = get_or_create_schema_reference(schema_type)
+        if ref:
+            rich = "✅ Google Rich Result" if ref["google_rich_result"] else "❌ No rich result"
+            req = ref["required_properties"] or "not specified"
+            schema_ref_context += f"\n{schema_type}: {rich} | Required: {req}"
+    if schema_ref_context:
+        schema_ref_context = "\nSCHEMA REFERENCE (from Google documentation):" + schema_ref_context + "\n"
+
     prompt = f"""Project: {project}
 Total pages: {len(page_summaries)}
 CONTEXT:
@@ -426,7 +441,7 @@ Your ONLY job: check whether the recommended @ids and @types listed below contra
 If the same entity appears with a different @id or @type on two different pages — flag it.
 If the recommendations are internally consistent — nothing to report.
 DO NOT introduce any new issues, observations, or advice of any kind.
-PAGES DATA (recommended schemas and @ids per page, after implementation):
+{schema_ref_context}PAGES DATA (recommended schemas and @ids per page, after implementation):
 {pages_data}
 You are a Schema.org QA auditor. Return a JSON array of English Notion blocks.
 
