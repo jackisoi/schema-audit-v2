@@ -32,6 +32,20 @@ def extract_schemas_from_json_ld(json_ld):
                 ids.append(i)
     return sorted(types), ids
 
+# --- Credits tracking ---
+SCRAPER_CREDITS = {
+    "cloudscraper":         0,
+    "scrapingbee_standard": 5,
+    "scrapingbee_premium":  75,
+    "playwright":           0,
+}
+SCRAPER_LABELS = {
+    "cloudscraper":         "cloudscraper (0 credits)",
+    "scrapingbee_standard": "ScrapingBee standard (5 credits)",
+    "scrapingbee_premium":  "ScrapingBee premium (75 credits)",
+    "playwright":           "Playwright (0 credits)",
+}
+claude_usage = {"input_tokens": 0, "output_tokens": 0}
 
 KNOWN_SCHEMA_TYPES = {
     "Organization", "LocalBusiness", "Hotel", "WebSite", "WebPage", "AboutPage",
@@ -221,6 +235,8 @@ EXISTING SCHEMAS (JSON-LD):
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": prompt_text}]
         )
+        claude_usage["input_tokens"]  += message.usage.input_tokens
+        claude_usage["output_tokens"] += message.usage.output_tokens
         raw = message.content[0].text.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1]
@@ -313,6 +329,8 @@ Rules:
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": prompt}]
     )
+    claude_usage["input_tokens"]  += message.usage.input_tokens
+    claude_usage["output_tokens"] += message.usage.output_tokens
     raw = message.content[0].text.strip()
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]
@@ -322,8 +340,65 @@ Rules:
         return result
     raise ValueError(f"Executive summary parse failed. Last 300: ...{raw[-300:]}")
 
+def build_credits_blocks(credits_summary, total_scraping_credits, claude_tokens):
+    blocks = [{
+        "object": "block", "type": "heading_2",
+        "heading_2": {"rich_text": [{"type": "text", "text": {"content": "Run Credits Summary"}}]}
+    }]
 
-def generate_qa_report(page_summaries, project):
+    # --- ScrapingBee ---
+    blocks.append({
+        "object": "block", "type": "heading_3",
+        "heading_3": {"rich_text": [{"type": "text", "text": {"content": "ScrapingBee"}}]}
+    })
+    for item in credits_summary:
+        label = SCRAPER_LABELS.get(item["method"], item["method"])
+        blocks.append({
+            "object": "block", "type": "bulleted_list_item",
+            "bulleted_list_item": {"rich_text": [{"type": "text", "text": {
+                "content": f"{item['url']} — {label}"
+            }}]}
+        })
+    blocks.append({
+        "object": "block", "type": "paragraph",
+        "paragraph": {"rich_text": [{"type": "text", "text": {
+            "content": f"Total ScrapingBee credits used: {total_scraping_credits}"
+        }}]}
+    })
+
+    # --- Claude API ---
+    input_t     = claude_tokens.get("input_tokens", 0)
+    output_t    = claude_tokens.get("output_tokens", 0)
+    input_cost  = round(input_t  / 1_000_000 * 3.00, 4)
+    output_cost = round(output_t / 1_000_000 * 15.00, 4)
+    total_cost  = round(input_cost + output_cost, 4)
+
+    blocks.append({
+        "object": "block", "type": "heading_3",
+        "heading_3": {"rich_text": [{"type": "text", "text": {"content": "Claude API (claude-sonnet-4-5)"}}]}
+    })
+    blocks.append({
+        "object": "block", "type": "bulleted_list_item",
+        "bulleted_list_item": {"rich_text": [{"type": "text", "text": {
+            "content": f"Input tokens:  {input_t:,}  (${input_cost})"
+        }}]}
+    })
+    blocks.append({
+        "object": "block", "type": "bulleted_list_item",
+        "bulleted_list_item": {"rich_text": [{"type": "text", "text": {
+            "content": f"Output tokens: {output_t:,}  (${output_cost})"
+        }}]}
+    })
+    blocks.append({
+        "object": "block", "type": "paragraph",
+        "paragraph": {"rich_text": [{"type": "text", "text": {
+            "content": f"Total Claude cost this run: ${total_cost}"
+        }}]}
+    })
+
+    return blocks
+
+def generate_qa_report(page_summaries, project, credits_summary=None, total_scraping_credits=0, claude_tokens=None):
     """
     Cross-page QA: checks Claude's RECOMMENDED schemas and @ids (not the live site).
     """
@@ -391,5 +466,7 @@ ABSOLUTE RULES:
         raw = raw.rsplit("```", 1)[0].strip()
     result = safe_parse(raw)
     if result is not None:
+        if credits_summary is not None:
+            result += build_credits_blocks(credits_summary, total_scraping_credits, claude_tokens or {})
         return result
     raise ValueError(f"QA report parse failed. Last 300: ...{raw[-300:]}")

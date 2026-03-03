@@ -58,47 +58,42 @@ def fetch_html_scrapingbee(url, premium=False):
 
 
 def fetch_html(url):
-    """Fetch HTML with 4-level fallback:
-    1. cloudscraper          — free, handles basic Cloudflare (0 credits)
-    2. ScrapingBee standard  — JS rendering, shared proxy (5 credits)
-    3. ScrapingBee premium   — JS rendering, residential proxy, CF Pro/Enterprise (75 credits)
-    4. Playwright            — local headless browser, last resort
     """
-    # --- Step 1: cloudscraper ---
+    Fetch HTML with 4-level fallback.
+    Returns (html, method) where method is one of:
+    cloudscraper | scrapingbee_standard | scrapingbee_premium | playwright
+    """
     try:
         scraper = cloudscraper.create_scraper()
         html = scraper.get(url, timeout=20).text
         if not _is_blocked(html):
             print(f"    [scraper] cloudscraper OK: {url}")
-            return html
+            return html, "cloudscraper"
         print(f"    [scraper] cloudscraper blocked, trying ScrapingBee standard...")
     except Exception as e:
         print(f"    [scraper] cloudscraper error: {e}")
 
     if SCRAPINGBEE_API_KEY:
-        # --- Step 2: ScrapingBee standard (5 credits) ---
         try:
             html = fetch_html_scrapingbee(url, premium=False)
             if not _is_blocked(html):
                 print(f"    [scraper] ScrapingBee standard OK: {url}")
-                return html
+                return html, "scrapingbee_standard"
             print(f"    [scraper] ScrapingBee standard blocked, trying ScrapingBee premium...")
         except Exception as e:
             print(f"    [scraper] ScrapingBee standard error: {e}")
 
-        # --- Step 3: ScrapingBee premium (75 credits) ---
         try:
             html = fetch_html_scrapingbee(url, premium=True)
             if not _is_blocked(html):
                 print(f"    [scraper] ScrapingBee premium OK: {url}")
-                return html
+                return html, "scrapingbee_premium"
             print(f"    [scraper] ScrapingBee premium also blocked, trying Playwright...")
         except Exception as e:
             print(f"    [scraper] ScrapingBee premium error: {e}")
     else:
         print(f"    [scraper] No SCRAPINGBEE_API_KEY set, skipping ScrapingBee...")
 
-    # --- Step 4: Playwright ---
     print(f"    [scraper] Falling back to Playwright: {url}")
     with sync_playwright() as p:
         browser = p.chromium.launch(
@@ -108,7 +103,7 @@ def fetch_html(url):
         page.goto(url, wait_until="networkidle", timeout=30000)
         html = page.content()
         browser.close()
-        return html
+        return html, "playwright"
 
 
 def extract_structured_data(html, url):
@@ -202,9 +197,10 @@ def analyze_content(html):
 
 
 def scan_page(url):
-    html = fetch_html(url)
+    html, scraper_used = fetch_html(url)
     return {
         "url": url,
+        "scraper_used": scraper_used,
         "structured_data": extract_structured_data(html, url),
         "content_analysis": analyze_content(html),
         "page_text": extract_main_text(html)

@@ -10,7 +10,9 @@ from claude_agent import (
     generate_executive_summary,
     generate_qa_report,
     extract_recommended_schemas,
-    extract_schemas_from_json_ld
+    extract_schemas_from_json_ld,
+    claude_usage,
+    SCRAPER_CREDITS,
 )
 from notion_writer import (
     get_or_create_project_page,
@@ -68,6 +70,9 @@ def webhook():
         print(f"DEBUG urls list: {json.dumps(urls, ensure_ascii=False)}")
 
         project_page_id = get_or_create_project_page(project)
+        # Reset Claude usage counter for this run
+        claude_usage["input_tokens"]  = 0
+        claude_usage["output_tokens"] = 0
         results = []
         page_summaries = []
 
@@ -130,7 +135,8 @@ def webhook():
                 "recommended_ids": result.get("recommended_ids", []),
                 "schemas_found": schemas_found,
                 "schema_ids": schema_ids,
-                "content_analysis": scan["content_analysis"]
+                "content_analysis": scan["content_analysis"],
+                "scraper_used": scan.get("scraper_used", "unknown"),
             })
 
         print("  Generating executive summary...")
@@ -144,10 +150,26 @@ def webhook():
 
         print("  Generating QA report...")
         try:
-            qa_blocks = generate_qa_report(page_summaries, project)
+            qa_blocks = generate_qa_report(
+            page_summaries, project,
+            credits_summary=credits_summary,
+            total_scraping_credits=total_scraping_credits,
+            claude_tokens=claude_tokens_snapshot,
+        )
             qa_url = write_qa_report(project_page_id, project, qa_blocks)
             print(f"  QA report: {qa_url}")
         except Exception as e:
+            # Build credits summary
+            credits_summary = [
+                {
+                    "url": p["url"],
+                    "method": p.get("scraper_used", "unknown"),
+                    "credits": SCRAPER_CREDITS.get(p.get("scraper_used", ""), 0),
+                }
+                for p in page_summaries
+            ]
+            total_scraping_credits = sum(c["credits"] for c in credits_summary)
+            claude_tokens_snapshot = dict(claude_usage)  # snapshot before QA call
             print(f"  QA report failed: {e}")
             qa_url = None
 
