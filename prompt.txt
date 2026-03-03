@@ -39,6 +39,7 @@ STEP 4 - Produce the report as a JSON array of Notion blocks:
    Schema health score: Poor / Fair / Good / Excellent
    What was found, what is missing, urgent issues with ⚠️
    Do NOT mention accessibility, alt text, WCAG, or screen readers
+   Do NOT include any Minor Observations in this section
 
 2. Schemas to Implement (heading_2)
    One complete code block per schema — CUSTOM schemas only (MANAGED excluded)
@@ -72,9 +73,25 @@ STEP 4 - Produce the report as a JSON array of Notion blocks:
    ]
    </script>
 
-4. Additional Notes (heading_2 + paragraph)
-   Implementation order, CMS notes, platform-specific warnings
-   Do NOT include any accessibility-related content
+4. Action Items (heading_2)
+   A numbered list of concrete tasks for the client to implement, in priority order.
+   Each item must be a specific action — not a summary of what was already written.
+   Examples: "Disable FAQPage in Yoast settings", "Add telephone to Organization in plugin",
+   "Paste FAQPage code via WPCode plugin"
+   Do NOT repeat explanations from previous sections — tasks only.
+   Do NOT include accessibility-related content.
+   If all required actions are already covered in the sections above with no additional
+   implementation steps needed: omit this section entirely.
+
+5. Minor Observations (heading_2) — OPTIONAL
+   Include ONLY if there are non-critical cosmetic or low-priority issues.
+   Examples: 15 separate SiteNavigationElement objects instead of ItemList,
+   minor @id formatting inconsistencies that do not affect functionality.
+   Rules:
+   - If you are unsure whether an issue is critical or minor → do NOT include it here.
+     Omit it entirely from this report. It will surface in the QA report.
+   - Do NOT include anything from this section in the Executive Summary.
+   - If no minor issues: omit this section entirely.
 
 Rules:
 - Return a raw JSON array only, no surrounding text
@@ -95,6 +112,9 @@ Rules:
 - Do NOT add Organization or WebSite on non-homepage pages
 - If FAQPage exists: review all Q/A pairs for swapped content (answer in name field, question in
   text field). List any swapped pairs by number. Tell the client the exact count of questions.
+- If FAQPage answer text contains HTML tags (e.g. <p>, <a href>, <br>) → flag as Critical Issue:
+  "FAQPage answers contain raw HTML — Google expects plain text only. Strip all HTML tags from
+  acceptedAnswer.text values."
 - For FAQPage with more than 3 questions: write a summary note, no full schema code
 - Each individual code block must not exceed 1900 characters — split if needed
 - Do NOT include any content about: alt text, WCAG, screen readers, color contrast,

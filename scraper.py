@@ -132,7 +132,7 @@ def extract_main_text(html):
         return {"text": None, "word_count": 0}
     paragraphs = [p.strip() for p in text.split("\n") if len(p.strip()) > 40]
     return {
-        "text": text[:3000],
+        "text": text[:8000],
         "paragraphs": paragraphs[:10],
         "word_count": len(text.split())
     }

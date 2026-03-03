@@ -103,7 +103,7 @@ def extract_faq_summary(json_ld):
                     question = q.get("name", "")
                     answer_obj = q.get("acceptedAnswer", {})
                     answer = answer_obj.get("text", "") if isinstance(answer_obj, dict) else ""
-                    faqs.append(f"Q{i}: {question[:120]}\nA{i}: {answer[:120]}")
+                    faqs.append(f"Q{i}: {question[:2000]}\nA{i}: {answer[:2000]}")
     return faqs
 
 
@@ -170,7 +170,7 @@ def analyze_with_scan(scan_result, level, page_type, project, parent_context=Non
         faq_section += "\n".join(faq_items)
 
     content_summary = f"""H1: {ca.get('h1') or 'Not found'}
-H2s: {', '.join(ca.get('h2s', [])[:5]) or 'None'}
+H2s: {', '.join(ca.get('h2s', [])[:10]) or 'None'}
 Video: {'Yes' if ca.get('video') else 'No'}
 Forms: {ca.get('forms') or 'None'}
 FAQ patterns: {'Yes' if ca.get('faq_patterns') else 'No'}
@@ -228,7 +228,7 @@ EXISTING SCHEMAS (JSON-LD):
         return raw
 
     # First attempt
-    raw = call_claude(build_prompt(2000))
+    raw = call_claude(build_prompt(5000))
     blocks = safe_parse(raw)
     if blocks is not None:
         rec_types, rec_ids = extract_recommended_schemas(blocks)
@@ -242,7 +242,7 @@ EXISTING SCHEMAS (JSON-LD):
     print("Retrying with simpler prompt...")
 
     # Retry
-    raw = call_claude(build_prompt(500))
+    raw = call_claude(build_prompt(1000))
     blocks = safe_parse(raw)
     if blocks is not None:
         rec_types, rec_ids = extract_recommended_schemas(blocks)
@@ -304,6 +304,7 @@ Rules:
 - Return raw JSON array of Notion blocks only
 - Be specific and actionable
 - Do NOT mention accessibility, alt text, WCAG, or screen readers
+- Do NOT include Minor Observations — only Critical Issues
 - Do not invent data not present in the summary above"""
 
     message = client.messages.create(
