@@ -71,6 +71,8 @@ def extract_recommended_schemas(blocks):
     types_found = []
     ids_found = []
     for block in blocks:
+        if not isinstance(block, dict):
+            continue
         block_type = block.get("type")
         inner = block.get(block_type, {})
         rich_text = inner.get("rich_text", [])
