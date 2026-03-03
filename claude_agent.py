@@ -307,13 +307,10 @@ Structure:
 1. heading_2: "סיכום מנהלים — {project}"
 2. paragraph: ציון בריאות כולל (Poor / Fair / Good / Excellent) + הסבר קצר
 3. heading_2: "ממצאים לפי דף"
-4. bulleted_list_item per page: שם הדף + מה נמצא + מה חסר
-5. heading_2: "⚠️ בעיות דחופות"
-6. bulleted_list_item: בעיות קריטיות (ללא נגישות)
-7. heading_2: "סדר עדיפויות מומלץ"
-8. numbered_list_item: משימות לפי סדר חשיבות
-9. heading_2: "הערות כלליות"
-10. paragraph: המלצות כלליות (CMS, Yoast)
+4. bulleted_list_item per page: שם הדף + סכמות שנמצאו בלבד. אין לציין מה חסר בסעיף זה.
+5. heading_2: "סדר עדיפויות מומלץ"
+6. numbered_list_item: משימות לפי סדר חשיבות. סמן פריטים קריטיים עם ⚠️ בתחילת השורה. כל פריט: פעולה + הסבר של שורה אחת בלבד. אין לחזור על מידע שכבר מופיע בסעיפים אחרים.
+7. heading_2: "הערות כלליות" — הכלל רק אם יש מידע חדש שלא הוזכר בסדר העדיפויות. מקסימום 3 נקודות. כלול רק: המלצות על כלי ניהול סכמות (Yoast, Schema Pro וכו') + אימות ב-Rich Results Test. אם אין מה להוסיף: השמט סעיף זה לחלוטין.
 
 Rules:
 - All text in Hebrew
@@ -445,7 +442,11 @@ Structure — include ONLY these sections:
 4. heading_2: "Partially Analyzed Pages"
    - ONLY include this section if any page used retry mode
    - Otherwise: omit this section entirely
-
+5. heading_2: "Report Quality Issues"
+   - For each individual page report, check if the same issue appears in more than one section
+     (e.g. in both Executive Summary AND Minor Observations, or in both Schemas to Implement AND Minor Observations)
+   - If found: flag as: "[page URL]: '[issue description]' appears in both [section A] and [section B] — should appear in Minor Observations only"
+   - If no such issues found: omit this section entirely
 ABSOLUTE RULES:
 - DO NOT write an opening summary or paragraph
 - DO NOT write positive confirmations ("X is correct", "Y is properly configured", "No issues here")

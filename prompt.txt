@@ -52,9 +52,13 @@ STEP 4 - Produce the report as a JSON array of Notion blocks:
 3. [Platform name] Configuration (heading_2)
    Text instructions only — NO code blocks here
    For each MANAGED schema: what to configure in the platform settings
-   If a managed schema is being REPLACED by a custom schema above:
-     write only: "Disable this auto-generated schema in plugin settings — see custom implementation above."
-     Do NOT repeat properties.
+    If a managed schema has issues that the plugin cannot resolve natively:
+    - FIRST: instruct the client to check if the plugin can be configured to fix the issue
+      (e.g. adjust settings, re-enter content as plain text, enable/disable a specific option).
+    - ONLY IF the plugin cannot resolve it: instruct to disable and use the custom implementation.
+      write: "First, check whether your SEO plugin can be configured to resolve this issue natively.
+      If not, disable this auto-generated schema in plugin settings — see custom implementation above."
+    This rule applies to ALL schema types — FAQPage, Product, LocalBusiness, BreadcrumbList, and any other.
    If SearchAction exists in the managed WebSite schema but no search form was detected:
      instruct to disable SearchAction in plugin settings.
    If no managed schemas exist on this page: omit this section entirely
@@ -72,6 +76,11 @@ STEP 4 - Produce the report as a JSON array of Notion blocks:
      { ...schema 2... }
    ]
    </script>
+  After the combined code block, always add this warning paragraph:
+"⚠️ Static code notice: This code is not dynamic. Any changes to the page content
+(questions, answers, products, business hours, etc.) must be manually updated in this
+code as well. Failing to maintain it will cause a mismatch between what visitors see
+and what Google reads." 
 
 4. Action Items (heading_2)
    A numbered list of concrete tasks for the client to implement, in priority order.
@@ -112,10 +121,18 @@ Rules:
 - Do NOT add Organization or WebSite on non-homepage pages
 - If FAQPage exists: review all Q/A pairs for swapped content (answer in name field, question in
   text field). List any swapped pairs by number. Tell the client the exact count of questions.
-- If FAQPage answer text contains HTML tags (e.g. <p>, <a href>, <br>) → flag as Critical Issue:
-  "FAQPage answers contain raw HTML — Google expects plain text only. Strip all HTML tags from
-  acceptedAnswer.text values."
+- If FAQPage answer text contains HTML tags (<p>, <a>, etc.): flag as an Action Item (NOT Critical) with this exact explanation:
+  "The acceptedAnswer.text fields contain raw HTML tags. Schema.org defines this field as plain Text, and Google's Rich Results Test may show a warning for HTML content. While Google does not strictly forbid HTML in this field, plain text is the accepted best practice — HTML tags may appear as literal characters in search results or cause partial content to be filtered out. Strip all <p>, <a href>, and other HTML markup from the answer text and replace with plain text only."
 - For FAQPage with more than 3 questions: write a summary note, no full schema code
 - Each individual code block must not exceed 1900 characters — split if needed
 - Do NOT include any content about: alt text, WCAG, screen readers, color contrast,
   aria labels, keyboard navigation, or any other accessibility topic
+- Any issue classified as Minor Observation must appear ONLY in the Minor Observations
+  section. It must NOT appear in the Executive Summary, Schemas to Implement, or
+  Action Items. Never mention the same issue in more than one section.
+- SiteNavigationElement consolidation (multiple separate objects vs. single ItemList)
+  is ALWAYS a Minor Observation only — never a Critical Issue, never in Executive Summary,
+  never in Schemas to Implement, and no implementation code. Write only:
+  "The site outputs [N] separate SiteNavigationElement objects. Consolidating them into
+  a single ItemList with ListItem children would be more efficient, but this does not
+  affect functionality."
