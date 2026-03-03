@@ -4,7 +4,6 @@ from dotenv import load_dotenv
 from notion_client import Client
 
 load_dotenv()
-
 notion = Client(auth=os.getenv("NOTION_API_KEY"))
 PARENT_PAGE_ID = os.getenv("NOTION_PARENT_PAGE_ID")
 
@@ -28,12 +27,15 @@ def code(text, language="json"):
 
 def get_or_create_project_page(project_name):
     """Find existing project page or create a new one under PARENT_PAGE_ID.
-    Page title includes the current date: 'Project Name — YYYY-MM-DD'
+    Page title includes the current date: 'Project Name — YYYY-MM-DD HH:MM'
     """
     from datetime import datetime
     date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     full_title = f"{project_name} — {date_str}"
-    results = notion.search(query=full_title, filter={"property": "object", "value": "page"}).get("results", [])
+    results = notion.search(
+        query=full_title,
+        filter={"property": "object", "value": "page"}
+    ).get("results", [])
     for page in results:
         title = page.get("properties", {}).get("title", {}).get("title", [])
         if title and title[0]["text"]["content"] == full_title:
@@ -63,10 +65,43 @@ _VALID_INNER_KEYS = {
     "code":                 {"rich_text", "language", "caption"},
     "divider":              set(),
 }
+
+
+def _split_code_content(content, language):
+    """Split a long code string into Notion code blocks, cutting only at newline boundaries."""
+    blocks = []
+    lines = content.splitlines(keepends=True)
+    chunk = ""
+    for line in lines:
+        if len(chunk) + len(line) > 1900:
+            if chunk:
+                blocks.append({
+                    "object": "block",
+                    "type": "code",
+                    "code": {
+                        "language": language,
+                        "rich_text": [{"type": "text", "text": {"content": chunk}}]
+                    }
+                })
+            chunk = line
+        else:
+            chunk += line
+    if chunk:
+        blocks.append({
+            "object": "block",
+            "type": "code",
+            "code": {
+                "language": language,
+                "rich_text": [{"type": "text", "text": {"content": chunk}}]
+            }
+        })
+    return blocks
+
+
 def sanitize_blocks(blocks):
     """Remove invalid fields from Claude-generated Notion blocks.
     - Strips unknown keys from inner block content dicts
-    - Auto-splits code blocks exceeding 1900 chars (Notion API limit)
+    - Auto-splits code blocks exceeding 1900 chars at newline boundaries
     """
     clean = []
     for block in blocks:
@@ -78,9 +113,11 @@ def sanitize_blocks(blocks):
         inner = block.get(block_type, {})
         if not isinstance(inner, dict):
             continue
-        # Strip invalid keys from inner content (e.g. nested 'object', 'type', 'heading_2' inside paragraph)
+
+        # Strip invalid keys from inner content
         valid_keys = _VALID_INNER_KEYS.get(block_type, {"rich_text"})
         inner = {k: v for k, v in inner.items() if k in valid_keys}
+
         # Auto-split code blocks that exceed 1900 chars
         if block_type == "code":
             rich_text = inner.get("rich_text", [])
@@ -91,19 +128,11 @@ def sanitize_blocks(blocks):
             )
             language = inner.get("language", "plain text")
             if len(content) > 1900:
-                for i in range(0, len(content), 1900):
-                    chunk = content[i:i+1900]
-                    clean.append({
-                        "object": "block",
-                        "type": "code",
-                        "code": {
-                            "language": language,
-                            "rich_text": [{"type": "text", "text": {"content": chunk}}]
-                        }
-                    })
+                clean.extend(_split_code_content(content, language))
             else:
                 clean.append({"object": "block", "type": block_type, block_type: inner})
             continue
+
         # Clean rich_text annotations
         rich_text = inner.get("rich_text", [])
         clean_rt = []
@@ -120,6 +149,8 @@ def sanitize_blocks(blocks):
             inner["rich_text"] = clean_rt
         clean.append({"object": "block", "type": block_type, block_type: inner})
     return clean
+
+
 def write_report_to_notion(project_page_id, url, blocks, used_retry=False):
     """Create a schema report sub-page under the project page."""
     title = f"Schema Report — {url}"
@@ -141,6 +172,8 @@ def write_report_to_notion(project_page_id, url, blocks, used_retry=False):
         children=all_blocks[:100]
     )
     return response["url"]
+
+
 def write_qa_report(project_page_id, project, blocks):
     """Create the QA report page under the project page."""
     title = f"דוח QA — {project}"
@@ -150,6 +183,8 @@ def write_qa_report(project_page_id, project, blocks):
         children=sanitize_blocks(blocks)[:100]
     )
     return response["url"]
+
+
 def write_executive_summary(project_page_id, project, blocks):
     """Create the executive summary page under the project page."""
     title = f"סיכום מנהלים — {project}"
@@ -195,11 +230,9 @@ def build_scan_blocks(scan_result):
         for i, item in enumerate(json_ld):
             blocks.append(para(f"JSON-LD block {i + 1}:"))
             content = json.dumps(item, indent=2, ensure_ascii=False)
-            for chunk in [content[j:j+1900] for j in range(0, len(content), 1900)]:
-                blocks.append(code(chunk))
+            blocks.extend(_split_code_content(content, "json"))
     else:
         blocks.append(para("No JSON-LD found."))
-
     return blocks
 
 

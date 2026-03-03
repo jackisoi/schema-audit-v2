@@ -320,7 +320,9 @@ Rules:
 - Be specific and actionable
 - Do NOT mention accessibility, alt text, WCAG, or screen readers
 - Do NOT include Minor Observations — only Critical Issues
-- Do not invent data not present in the summary above"""
+- Do not invent data not present in the summary above
+- Do NOT write QA audit notes, internal verification statements, or negative-result checks (e.g. "X appears correctly paired", "no swapping detected") — these belong in the QA report, not here"""
+
 
     message = client.messages.create(
         model="claude-sonnet-4-5",
@@ -428,8 +430,8 @@ Structure — include ONLY these sections:
 
 1. heading_2: "@id Consistency Issues"
    - List ONLY actual problems found (e.g. same entity uses different @id on different pages)
-   - If no issues found: single bulleted_list_item: "No @id inconsistencies found"
-   - DO NOT write confirmations like "X is correctly implemented" or "Y looks good"
+   - If no issues found: one bulleted_list_item: "No @id inconsistencies found" — NO other bullets in this section
+   - DO NOT add context, observations, or background — if it is not a problem, do not write it at all
 
 2. heading_2: "Cross-Page Issues"
    - List ONLY issues that span multiple pages and were not addressed per-page

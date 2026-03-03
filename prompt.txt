@@ -112,6 +112,7 @@ Rules:
 - CRITICAL: If RECOMMENDED SCHEMAS FROM PARENT PAGES are provided, use those @id values
   exactly. Never invent alternative @id values for entities defined in parent pages.
 - Never invent or estimate property values — use: // REQUIRED: [description]
+- Integer-type properties (numberOfItems, position, ratingValue, etc.) must be OMITTED entirely if the value is unknown — do NOT use a string placeholder for integer fields
 - Never write field values not explicitly present on the page
 - Never add starRating or aggregateRating unless confirmed on the page
 - Never include sameAs: [] — if social URLs unknown, omit sameAs entirely

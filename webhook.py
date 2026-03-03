@@ -172,15 +172,19 @@ def webhook():
         except Exception as e:
             print(f"  QA report failed: {e}")
             qa_url = None
+        if summary_url and qa_url:
+            status_emoji = "✅"
+            status_text = "ריצה הסתיימה בהצלחה"
+        else:
+            failed_parts = []
+            if not summary_url:
+                failed_parts.append("exec summary")
+            if not qa_url:
+                failed_parts.append("QA report")
+            status_emoji = "⚠️"
+            status_text = f"ריצה הסתיימה עם שגיאות: {', '.join(failed_parts)}"
 
-        send_ntfy(f"✅ {project} — ריצה הסתיימה בהצלחה ({len(results)} דפים)")
-        return jsonify({
-            "status": "ok",
-            "project": project,
-            "results": results,
-            "summary": summary_url,
-            "qa": qa_url
-        })
+        send_ntfy(f"{status_emoji} {project} — {status_text} ({len(results)} דפים)")
 
     except Exception as e:
         traceback.print_exc()
