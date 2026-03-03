@@ -56,7 +56,7 @@ KNOWN_SCHEMA_TYPES = {
 }
 # Sub-types that appear nested inside schemas — not top-level page schemas
 NESTED_SCHEMA_TYPES = {
-    "Country", "OfferCatalog", "Offer", "Question", "Answer",
+    "Country", "OfferCatalog", "Offer", "AggregateOffer", "Question", "Answer",
     "PostalAddress", "GeoCoordinates", "ContactPoint", "OpeningHoursSpecification",
     "MonetaryAmount", "PropertyValue", "ListItem", "ItemList",
     "EntryPoint", "SearchAction", "ReadAction", "ImageObject"
@@ -100,8 +100,9 @@ def extract_recommended_schemas(blocks):
                 if isinstance(rt, dict)
             )
             for schema_type in KNOWN_SCHEMA_TYPES:
-                if schema_type in content and schema_type not in types_found:
-                    types_found.append(schema_type)
+                if schema_type not in types_found:
+                    if f'"@type": "{schema_type}"' in content or f'"@type":"{schema_type}"' in content:
+                        types_found.append(schema_type)
     # Filter out nested/sub-types — keep only top-level page schema types
     types_found = [t for t in types_found if t not in NESTED_SCHEMA_TYPES]
     print(f"    [extract_recommended_schemas] types: {types_found} | ids count: {len(ids_found)}")
