@@ -20,10 +20,14 @@ def lookup_schema_reference(schema_type):
     Returns a dict with reference data, or None if not found.
     """
     try:
-        results = _get_notion().databases.query(
-            database_id=SCHEMA_REFERENCE_DB_ID,
-            filter={"property": "Schema Type", "title": {"equals": schema_type}}
+        all_results = _get_notion().search(
+            query=schema_type,
+            filter={"property": "object", "value": "page"}
         ).get("results", [])
+        results = [
+            r for r in all_results
+            if r.get("parent", {}).get("database_id", "").replace("-", "") == SCHEMA_REFERENCE_DB_ID.replace("-", "")
+        ]
         if not results:
             return None
         props = results[0]["properties"]
