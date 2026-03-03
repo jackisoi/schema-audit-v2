@@ -1,7 +1,7 @@
-# v1.6 — webhook secret auth
 import os
 import traceback
 import json
+import requests
 from flask import Flask, request, jsonify
 from notion_client import Client
 from scraper import scan_page
@@ -24,6 +24,12 @@ load_dotenv()
 
 app = Flask(__name__)
 notion = Client(auth=os.getenv("NOTION_API_KEY"))
+NTFY_TOPIC = os.getenv("NTFY_TOPIC", "jacki-schema-audit-2026")
+def send_ntfy(message):
+    try:
+        requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", data=message.encode("utf-8"), timeout=5)
+    except Exception:
+        pass
 
 
 def is_page_blocked(scan):
@@ -111,21 +117,21 @@ def webhook():
             print(f"  Done: {notion_url}")
             results.append({"url": url, "notion": notion_url})
 
-            sd = scan["structured_data"]
-            json_ld = sd.get("json-ld", [])
-            schemas_found, schema_ids = extract_schemas_from_json_ld(json_ld)
-
-            page_summaries.append({
-                "url": url,
-                "level": level,
-                "page_type": page_type,
-                "used_retry": used_retry,
-                "recommended_schemas": result.get("recommended_schemas", []),
-                "recommended_ids": result.get("recommended_ids", []),
-                "schemas_found": schemas_found,
-                "schema_ids": schema_ids,
-                "content_analysis": scan["content_analysis"]
-            })
+						sd = scan["structured_data"]
+						json_ld = sd.get("json-ld", [])
+						schemas_found, schema_ids = extract_schemas_from_json_ld(json_ld)
+						
+						page_summaries.append({
+						    "url": url,
+						    "level": level,
+						    "page_type": page_type,
+						    "used_retry": used_retry,
+						    "recommended_schemas": result.get("recommended_schemas", []),
+						    "recommended_ids": result.get("recommended_ids", []),
+						    "schemas_found": schemas_found,
+						    "schema_ids": schema_ids,
+						    "content_analysis": scan["content_analysis"]
+						})
 
         print("  Generating executive summary...")
         try:
@@ -145,6 +151,7 @@ def webhook():
             print(f"  QA report failed: {e}")
             qa_url = None
 
+        send_ntfy(f"✅ {project} — ריצה הסתיימה בהצלחה ({len(results)} דפים)")
         return jsonify({
             "status": "ok",
             "project": project,
@@ -155,6 +162,8 @@ def webhook():
 
     except Exception as e:
         traceback.print_exc()
+        _project = locals().get("project", "Unknown")
+        send_ntfy(f"❌ {_project} — ריצה נכשלה: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
