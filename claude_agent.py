@@ -339,55 +339,44 @@ Page: {p['url']}{retry_note}
   Recommended @ids:
     {rec_ids}
 """
-
     prompt = f"""Project: {project}
 Total pages: {len(page_summaries)}
 CONTEXT:
 Each page has already received a dedicated Schema Report with specific fix instructions.
 ASSUME all those recommendations will be fully implemented by the client.
 Your job is ONLY to identify cross-page consistency issues that individual reports cannot catch.
-DO NOT re-flag any issue that was already addressed in a per-page report.
 PAGES DATA (recommended schemas and @ids per page, after implementation):
 {pages_data}
-You are a Schema.org QA auditor. Flag ONLY issues that:
-1. Span multiple pages (e.g. same entity uses different @id on different pages)
-2. Could not have been caught by a single-page review
-3. Were NOT already covered by individual page recommendations
-Return a JSON array of English Notion blocks.
-Structure:
-1. heading_2: "QA Report — {project}"
-2. paragraph: brief summary of unresolved cross-page issues only
-3. heading_2: "@id Consistency"
-   - Check that the same entity uses the same @id across all pages
-   - Check slash/no-slash consistency in @ids
-   - Check that subpages correctly reference parent @ids
-   - If no issues: single bulleted_list_item: "No @id inconsistencies found"
-4. heading_2: "Cross-Page Issues"
-   - Only issues that span multiple pages and were not addressed per-page
+You are a Schema.org QA auditor. Return a JSON array of English Notion blocks.
+
+Structure — include ONLY these sections:
+
+1. heading_2: "@id Consistency Issues"
+   - List ONLY actual problems found (e.g. same entity uses different @id on different pages)
+   - If no issues found: single bulleted_list_item: "No @id inconsistencies found"
+   - DO NOT write confirmations like "X is correctly implemented" or "Y looks good"
+
+2. heading_2: "Cross-Page Issues"
+   - List ONLY issues that span multiple pages and were not addressed per-page
    - If no issues: single bulleted_list_item: "No cross-page issues found"
-4b. heading_2: "Uncertain — Needs Review"
-   - Issues you are unsure whether they were already covered in per-page reports
-   - For each: briefly explain what the issue is AND why you are uncertain
+   - DO NOT write confirmations or summaries
+
+3. heading_2: "Uncertain — Needs Review"
+   - ONLY include this section if there are things Claude could not determine
+   - For each item: what is uncertain AND why Claude could not resolve it
    - If nothing uncertain: omit this section entirely
-5. heading_2: "Partially Analyzed Pages"
-   - Only include this section if any page used retry mode
+
+4. heading_2: "Partially Analyzed Pages"
+   - ONLY include this section if any page used retry mode
    - Otherwise: omit this section entirely
-6. heading_2: "Pre-Launch Checklist"
-   - to_do blocks: ONLY validation steps not covered by individual reports
-   - Focus on: cross-page validation, Google Rich Results Test after full deployment
-ABSOLUTE FILTER — apply this test to EVERY issue before including it:
-"Is there a recommendation in ANY individual page report that, if implemented, would resolve this issue?"
-If YES → exclude it entirely. Do not mention it. Do not summarize it. Do not reference it.
-The QA report exists ONLY for issues with NO corresponding recommendation in any page report.
-Rules:
-- All text in English
-- Return raw JSON array of Notion blocks only
-- to_do blocks: type is \"to_do\", checked is false
-- Be precise: reference specific @id values and page URLs
-- DO NOT flag missing schemas — those are handled in individual page reports
+
+ABSOLUTE RULES:
+- DO NOT write an opening summary or paragraph
+- DO NOT write positive confirmations ("X is correct", "Y is properly configured", "No issues here")
+- DO NOT include pre-launch checklists, implementation advice, or testing instructions
 - DO NOT repeat any recommendation from individual page reports
-- ONLY flag genuine cross-page inconsistencies
-- When in doubt whether an issue was already covered — include it under a separate heading_2: "Uncertain — Needs Review", with a brief note explaining why it may or may not be redundant with per-page reports"""
+- ONLY flag genuine cross-page inconsistencies and uncertainties
+- Return raw JSON array of Notion blocks only, all text in English"""
 
     message = client.messages.create(
         model="claude-sonnet-4-5",
