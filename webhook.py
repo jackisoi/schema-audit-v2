@@ -29,7 +29,8 @@ NTFY_TOPIC = os.getenv("NTFY_TOPIC", "jacki-schema-audit-2026")
 
 def send_ntfy(message):
     try:
-        requests.post(f"https://ntfy.sh/{NTFY_TOPIC}", data=message.encode("utf-8"), timeout=5)
+        ntfy_url = "https://" + "ntfy.sh/" + NTFY_TOPIC
+        requests.post(ntfy_url, data=message.encode("utf-8"), timeout=5)
     except Exception:
         pass
 
@@ -172,6 +173,7 @@ def webhook():
         except Exception as e:
             print(f"  QA report failed: {e}")
             qa_url = None
+
         if summary_url and qa_url:
             status_emoji = "✅"
             status_text = "ריצה הסתיימה בהצלחה"
@@ -185,6 +187,13 @@ def webhook():
             status_text = f"ריצה הסתיימה עם שגיאות: {', '.join(failed_parts)}"
 
         send_ntfy(f"{status_emoji} {project} — {status_text} ({len(results)} דפים)")
+        return jsonify({
+            "status": "ok",
+            "project": project,
+            "results": results,
+            "summary": summary_url,
+            "qa": qa_url
+        })
 
     except Exception as e:
         traceback.print_exc()
