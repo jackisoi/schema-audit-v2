@@ -35,7 +35,13 @@ STEP 3 - Cross-page awareness:
 
 STEP 4 - Produce the report as a JSON array of Notion blocks:
 
-1. Schemas to Implement (heading_2)
+1. Executive Summary (heading_2 + paragraph)
+   Schema health score: Poor / Fair / Good / Excellent
+   What was found, what is missing, urgent issues with ⚠️
+   Do NOT mention accessibility, alt text, WCAG, or screen readers
+   Do NOT include any Minor Observations in this section
+
+2. Schemas to Implement (heading_2)
    One complete code block per schema — CUSTOM schemas only (MANAGED excluded)
    Label each block:
    - NEW — schema that does not exist on the page yet
@@ -43,10 +49,8 @@ STEP 4 - Produce the report as a JSON array of Notion blocks:
    If a schema replaces an existing one: provide the complete final version, not a diff
    This section combines both new schemas AND replacements — do NOT split into two sections
 
-2. [Platform name] Configuration (heading_2)
-    If the platform is identified with certainty: use its name (e.g. "Yoast SEO Configuration", "RankMath Configuration").
-    If the platform cannot be identified with certainty: use "SEO Plugin Configuration (plugin not identified)".
-    Text instructions only — NO code blocks here
+3. [Platform name] Configuration (heading_2)
+   Text instructions only — NO code blocks here
    For each MANAGED schema: what to configure in the platform settings
     If a managed schema has issues that the plugin cannot resolve natively:
     - FIRST: instruct the client to check if the plugin can be configured to fix the issue
@@ -78,7 +82,7 @@ STEP 4 - Produce the report as a JSON array of Notion blocks:
 code as well. Failing to maintain it will cause a mismatch between what visitors see
 and what Google reads." 
 
-3. Action Items (heading_2)
+4. Action Items (heading_2)
    A numbered list of concrete tasks for the client to implement, in priority order.
    Each item must be a specific action — not a summary of what was already written.
    Examples: "Disable FAQPage in Yoast settings", "Add telephone to Organization in plugin",
@@ -88,7 +92,7 @@ and what Google reads."
    If all required actions are already covered in the sections above with no additional
    implementation steps needed: omit this section entirely.
 
-4. Minor Observations (heading_2) — OPTIONAL
+5. Minor Observations (heading_2) — OPTIONAL
    Include ONLY if there are non-critical cosmetic or low-priority issues.
    Examples: 15 separate SiteNavigationElement objects instead of ItemList,
    minor @id formatting inconsistencies that do not affect functionality.
@@ -111,7 +115,6 @@ Rules:
 - Integer-type properties (numberOfItems, position, ratingValue, etc.) must be OMITTED entirely if the value is unknown — do NOT use a string placeholder for integer fields
 - Never write field values not explicitly present on the page
 - Never add starRating or aggregateRating unless confirmed on the page
-- telephone property must always use E.164 format: + followed by country code and digits only, no hyphens, no spaces, no parentheses (e.g. +972544556217, not +972-54-4556217)
 - Never include sameAs: [] — if social URLs unknown, omit sameAs entirely
 - Never recommend SearchAction unless a search input is confirmed on the page
 - If SearchAction exists in existing schemas but no search form detected: flag as issue to disable
@@ -119,7 +122,8 @@ Rules:
 - Do NOT add Organization or WebSite on non-homepage pages
 - If FAQPage exists: review all Q/A pairs for swapped content (answer in name field, question in
   text field). List any swapped pairs by number. Tell the client the exact count of questions.
-- If FAQPage answer text contains HTML tags (<p>, <a>, etc.): flag ONLY as a Minor Observation — do NOT mention this in the Executive Summary, do NOT mention this in the SEO Plugin Configuration section, do NOT mention this in Action Items, do NOT mark it as critical, do NOT use ⚠️ for this issue.
+- If FAQPage answer text contains HTML tags (<p>, <a>, etc.): flag as an Action Item (NOT Critical) with this exact explanation:
+  "The acceptedAnswer.text fields contain raw HTML tags. Schema.org defines this field as plain Text, and Google's Rich Results Test may show a warning for HTML content. While Google does not strictly forbid HTML in this field, plain text is the accepted best practice — HTML tags may appear as literal characters in search results or cause partial content to be filtered out. Strip all <p>, <a href>, and other HTML markup from the answer text and replace with plain text only."
 - For FAQPage with more than 3 questions: write a summary note, no full schema code
 - Each individual code block must not exceed 1900 characters — split if needed
 - Do NOT include any content about: alt text, WCAG, screen readers, color contrast,
@@ -128,10 +132,8 @@ Rules:
   section. It must NOT appear in the Executive Summary, Schemas to Implement, or
   Action Items. Never mention the same issue in more than one section.
 - SiteNavigationElement consolidation (multiple separate objects vs. single ItemList)
-is ALWAYS a Minor Observation only — never a Critical Issue, never in Executive Summary,
-never in Schemas to Implement, and no implementation code.
-ABSOLUTE: Do NOT mention SiteNavigationElement in the Executive Summary under any circumstances — not even with a ⚠️, not even as a passing note. It belongs ONLY in Minor Observations.
-Write only:
-"The site outputs [N] separate SiteNavigationElement objects. Consolidating them into
-a single ItemList with ListItem children would be more efficient, but this does not
-affect functionality."
+  is ALWAYS a Minor Observation only — never a Critical Issue, never in Executive Summary,
+  never in Schemas to Implement, and no implementation code. Write only:
+  "The site outputs [N] separate SiteNavigationElement objects. Consolidating them into
+  a single ItemList with ListItem children would be more efficient, but this does not
+  affect functionality."

@@ -33,7 +33,6 @@ def lookup_schema_reference(schema_type):
         props = results[0]["properties"]
         def get_text(prop):
             return "".join(r["text"]["content"] for r in prop.get("rich_text", []))
-        date_prop = props.get("Last Verified", {}).get("date") or {}
         return {
             "google_rich_result": props["Google Rich Result"]["checkbox"],
             "required_properties": get_text(props["Required Properties"]),
@@ -41,8 +40,6 @@ def lookup_schema_reference(schema_type):
             "google_docs_url": props["Google Docs URL"].get("url") or "",
             "schema_org_url": props["schema.org URL"].get("url") or "",
             "source": (props["Source"]["select"] or {}).get("name", ""),
-            "last_verified": date_prop.get("start") or "",
-            "_page_id": results[0]["id"],
         }
     except Exception as e:
         print(f"    [schema_ref] lookup error for {schema_type}: {e}")

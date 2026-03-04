@@ -71,7 +71,6 @@ def extract_recommended_schemas(blocks):
     """
     types_found = []
     ids_found = []
-    properties_per_type = {}
     for block in blocks:
         if not isinstance(block, dict):
             continue
@@ -89,25 +88,6 @@ def extract_recommended_schemas(blocks):
         for match in re.findall(r'"@id"\s*:\s*"([^"]+)"', content):
             if match not in ids_found:
                 ids_found.append(match)
-        if block_type == "code":
-            try:
-                parsed = json.loads(content)
-                items_to_check = []
-                if isinstance(parsed, list):
-                    for item in parsed:
-                        if isinstance(item, dict):
-                            items_to_check.extend(item.get("@graph", [item]))
-                elif isinstance(parsed, dict):
-                    items_to_check.extend(parsed.get("@graph", [parsed]))
-                for item in items_to_check:
-                    stype = item.get("@type")
-                    if isinstance(stype, list):
-                        stype = stype[0]
-                    if stype:
-                        props = [k for k in item.keys() if not k.startswith("@")]
-                        properties_per_type.setdefault(stype, set()).update(props)
-            except Exception:
-                pass
     # Fallback: no explicit @type patterns found (all-managed page like Yoast/RankMath)
     # Scan all text content for known Schema.org type names
     if not types_found:
@@ -126,9 +106,8 @@ def extract_recommended_schemas(blocks):
                         types_found.append(schema_type)
     # Filter out nested/sub-types — keep only top-level page schema types
     types_found = [t for t in types_found if t not in NESTED_SCHEMA_TYPES]
-    properties_per_type = {k: sorted(v) for k, v in properties_per_type.items()}
     print(f"    [extract_recommended_schemas] types: {types_found} | ids count: {len(ids_found)}")
-    return types_found, ids_found, properties_per_type
+    return types_found, ids_found
 
 
 def extract_faq_summary(json_ld):
@@ -272,13 +251,12 @@ EXISTING SCHEMAS (JSON-LD):
     raw = call_claude(build_prompt(5000))
     blocks = safe_parse(raw)
     if blocks is not None:
-        rec_types, rec_ids, rec_props = extract_recommended_schemas(blocks)
+        rec_types, rec_ids = extract_recommended_schemas(blocks)
         return {
             "blocks": blocks,
             "used_retry": False,
             "recommended_schemas": rec_types,
-            "recommended_ids": rec_ids,
-            "recommended_properties": rec_props
+            "recommended_ids": rec_ids
         }
     print(f"JSON parse error (last 300 chars): ...{raw[-300:]}")
     print("Retrying with simpler prompt...")
@@ -287,13 +265,12 @@ EXISTING SCHEMAS (JSON-LD):
     raw = call_claude(build_prompt(1000))
     blocks = safe_parse(raw)
     if blocks is not None:
-        rec_types, rec_ids, rec_props = extract_recommended_schemas(blocks)
+        rec_types, rec_ids = extract_recommended_schemas(blocks)
         return {
             "blocks": blocks,
             "used_retry": True,
             "recommended_schemas": rec_types,
-            "recommended_ids": rec_ids,
-            "recommended_properties": rec_props
+            "recommended_ids": rec_ids
         }
     raise ValueError(f"Both attempts failed. Last 300 chars: ...{raw[-300:]}")
 
@@ -331,12 +308,13 @@ PAGES SUMMARY:
 Write a comprehensive executive summary in Hebrew as a JSON array of Notion blocks.
 
 Structure:
-1. paragraph: ציון בריאות כולל (Poor / Fair / Good / Excellent) + הסבר קצר
-2. heading_2: "ממצאים לפי דף"
-3. bulleted_list_item per page: שם הדף + סכמות שנמצאו בלבד. אין לציין מה חסר בסעיף זה.
-4. heading_2: "סדר עדיפויות מומלץ"
-5. numbered_list_item: משימות לפי סדר חשיבות. סמן פריטים קריטיים עם ⚠️ בתחילת השורה. כל פריט: פעולה + הסבר של שורה אחת בלבד. אין לחזור על מידע שכבר מופיע בסעיפים אחרים.
-6. heading_2: "הערות כלליות"
+1. heading_2: "סיכום מנהלים — {project}"
+2. paragraph: ציון בריאות כולל (Poor / Fair / Good / Excellent) + הסבר קצר
+3. heading_2: "ממצאים לפי דף"
+4. bulleted_list_item per page: שם הדף + סכמות שנמצאו בלבד. אין לציין מה חסר בסעיף זה.
+5. heading_2: "סדר עדיפויות מומלץ"
+6. numbered_list_item: משימות לפי סדר חשיבות. סמן פריטים קריטיים עם ⚠️ בתחילת השורה. כל פריט: פעולה + הסבר של שורה אחת בלבד. אין לחזור על מידע שכבר מופיע בסעיפים אחרים.
+7. heading_2: "הערות כלליות" — הכלל רק אם יש מידע חדש שלא הוזכר בסדר העדיפויות. מקסימום 3 נקודות. כלול רק: המלצות על כלי ניהול סכמות (Yoast, Schema Pro וכו') + אימות ב-Rich Results Test. אם אין מה להוסיף: השמט סעיף זה לחלוטין.
 
 Rules:
 - All text in Hebrew
@@ -345,11 +323,8 @@ Rules:
 - Do NOT mention accessibility, alt text, WCAG, or screen readers
 - Do NOT include Minor Observations — only Critical Issues
 - Do not invent data not present in the summary above
-- Do NOT write QA audit notes, internal verification statements, or negative-result checks (e.g. "X appears correctly paired", "no swapping detected") — these belong in the QA report, not here
-- Do NOT recommend adding AggregateRating or Review unless at least one page in the summary explicitly confirms ratings or reviews exist on the page
-- Do NOT use conditional language ("אם יש", "שקול אם") for properties or entities whose data is already present in the summary — if the data exists, state the recommendation directly
-- Every recommendation in "סדר עדיפויות מומלץ" must be grounded in a specific finding from the pages above — do NOT generate generic SEO advice not tied to actual page data
-- If a schema property already exists on a page (e.g. Offer with price), do NOT list adding that property as a missing item — only flag"""
+- Do NOT write QA audit notes, internal verification statements, or negative-result checks (e.g. "X appears correctly paired", "no swapping detected") — these belong in the QA report, not here"""
+
 
     message = client.messages.create(
         model="claude-sonnet-4-5",
@@ -434,18 +409,15 @@ def generate_qa_report(page_summaries, project, credits_summary=None, total_scra
     for p in page_summaries:
         rec_types = ", ".join(p.get("recommended_schemas", [])) or "none extracted"
         rec_ids = "\n    ".join(p.get("recommended_ids", [])) or "none extracted"
-        rec_props = p.get("recommended_properties", {})
         retry_note = " ⚠️ [partial analysis]" if p.get("used_retry") else ""
-        props_lines = ""
-        for stype in p.get("recommended_schemas", []):
-            props = rec_props.get(stype, [])
-            props_str = ", ".join(props) if props else "(managed — not extracted)"
-            props_lines += f"\n    {stype}: {props_str}"
-        pages_data += f"""Page: {p['url']}{retry_note}
-    Type: {p['page_type']} | Level: {p['level']}
-    Recommended @types:    {rec_types}
-    Recommended @ids:    {rec_ids}
-    Properties in recommended code:{props_lines}"""
+        pages_data += f"""
+Page: {p['url']}{retry_note}
+  Type: {p['page_type']} | Level: {p['level']}
+  Recommended @types:
+    {rec_types}
+  Recommended @ids:
+    {rec_ids}
+"""
     # Build schema reference context for QA validation
     all_schema_types = set()
     for p in page_summaries:
@@ -454,21 +426,9 @@ def generate_qa_report(page_summaries, project, credits_summary=None, total_scra
     for schema_type in sorted(all_schema_types):
         ref = get_or_create_schema_reference(schema_type)
         if ref:
-            g_req = ref.get("required_properties", "")
-            g_rec = ref.get("recommended_properties", "")
-            s_req = ref.get("required_schema_org", "")
-            s_rec = ref.get("recommended_schema_org", "")
-            has_google = bool(g_req or g_rec)
-            has_schema_org = bool(s_req or s_rec)
-            if has_google and has_schema_org:
-                icon = "⭐🤖"
-            elif has_google:
-                icon = "⭐"
-            else:
-                icon = "🤖"
-            schema_ref_context += f"\n{icon} {schema_type}"
-            schema_ref_context += f"\n  Google → Required: {g_req or 'empty'} | Recommended: {g_rec or 'empty'}"
-            schema_ref_context += f"\n  Schema.org → Required: {s_req or 'empty'} | Recommended: {s_rec or 'empty'}"
+            rich = "✅ Google Rich Result" if ref["google_rich_result"] else "❌ No rich result"
+            req = ref["required_properties"] or "not specified"
+            schema_ref_context += f"\n{schema_type}: {rich} | Required: {req}"
     if schema_ref_context:
         schema_ref_context = "\nSCHEMA REFERENCE (from Google documentation):" + schema_ref_context + "\n"
 
@@ -509,30 +469,6 @@ Structure — include ONLY these sections:
      (e.g. in both Executive Summary AND Minor Observations, or in both Schemas to Implement AND Minor Observations)
    - If found: flag as: "[page URL]: '[issue description]' appears in both [section A] and [section B] — should appear in Minor Observations only"
    - If no such issues found: omit this section entirely
-6. heading_2: "Schema Validation & AI/LLM Impact"
-   - Use the SCHEMA REFERENCE block above to validate every recommended @type across all pages
-   - For each recommended @type, determine its icon from SCHEMA REFERENCE (⭐🤖 / ⭐ / 🤖) and apply the matching rule:
-
-    VALIDATION PROCESS — follow these steps FOR EACH @type:
-    STEP 1: Find the @type in PAGES DATA above. Read the "Properties in recommended code" list for that type.
-    STEP 2: Check whether each required/recommended property from SCHEMA REFERENCE appears in that list.
-    STEP 3: If the property EXISTS in the list → it is NOT missing → do NOT flag it.
-            If the property is GENUINELY ABSENT from the list → flag it.
-    DO NOT flag a property based on memory or assumptions — only based on "Properties in recommended code" above.
-
-    ROWS 1-2 (⭐🤖, Google=Required): after STEP 1-3, if absent → "[icon] [SchemaType] ⚠️ Missing required: [property]"
-    ROWS 3-4 (⭐🤖, Google=Recommended): after STEP 1-3, if absent → "[icon] [SchemaType] Note: Missing recommended: [property]"
-    ROW 5 (⭐, Google=Required, Schema.org=empty): after STEP 1-3, if absent → "[icon] [SchemaType] ⚠️ Missing required: [property]"
-    ROW 6 (⭐, Google=Recommended, Schema.org=empty): after STEP 1-3, if absent → "[icon] [SchemaType] Note: Missing recommended: [property]"
-    ROW 7 (🤖, Google=empty, Schema.org=Required): after STEP 1-3, if absent → "🤖 [SchemaType]: Missing required per Schema.org: [property]"
-    ROW 8 (🤖, Google=empty, Schema.org=Recommended): after STEP 1-3, if absent → "🤖 [SchemaType]: Missing recommended per Schema.org: [property]"
-
-   - If a type is not found in SCHEMA REFERENCE → "[SchemaType]: Not found in Schema Reference DB — unable to validate"
-   - If no issues found for a type → skip it entirely, do NOT write anything
-   - After all per-type bullets, if ANY 🤖 types exist, add:
-     heading_3: "Note on Schema.org / AI Value"
-     paragraph: "Schema types marked 🤖 have no Google Rich Result requirements but are part of the Schema.org standard. They contribute to entity recognition and may influence how AI systems (Google AI Overview, ChatGPT, Perplexity) understand and surface this content."
-   - DO NOT invent requirements not present in the SCHEMA REFERENCE block
 ABSOLUTE RULES:
 - DO NOT write an opening summary or paragraph
 - DO NOT write positive confirmations ("X is correct", "Y is properly configured", "No issues here")
