@@ -50,7 +50,9 @@ STEP 4 - Produce the report as a JSON array of Notion blocks:
    This section combines both new schemas AND replacements — do NOT split into two sections
 
 3. [Platform name] Configuration (heading_2)
-   Text instructions only — NO code blocks here
+    If the platform is identified with certainty: use its name (e.g. "Yoast SEO Configuration", "RankMath Configuration").
+    If the platform cannot be identified with certainty: use "SEO Plugin Configuration (plugin not identified)".
+    Text instructions only — NO code blocks here
    For each MANAGED schema: what to configure in the platform settings
     If a managed schema has issues that the plugin cannot resolve natively:
     - FIRST: instruct the client to check if the plugin can be configured to fix the issue
