@@ -323,8 +323,11 @@ Rules:
 - Do NOT mention accessibility, alt text, WCAG, or screen readers
 - Do NOT include Minor Observations — only Critical Issues
 - Do not invent data not present in the summary above
-- Do NOT write QA audit notes, internal verification statements, or negative-result checks (e.g. "X appears correctly paired", "no swapping detected") — these belong in the QA report, not here"""
-
+- Do NOT write QA audit notes, internal verification statements, or negative-result checks (e.g. "X appears correctly paired", "no swapping detected") — these belong in the QA report, not here
+- Do NOT recommend adding AggregateRating or Review unless at least one page in the summary explicitly confirms ratings or reviews exist on the page
+- Do NOT use conditional language ("אם יש", "שקול אם") for properties or entities whose data is already present in the summary — if the data exists, state the recommendation directly
+- Every recommendation in "סדר עדיפויות מומלץ" must be grounded in a specific finding from the pages above — do NOT generate generic SEO advice not tied to actual page data
+- If a schema property already exists on a page (e.g. Offer with price), do NOT list adding that property as a missing item — only flag"""
 
     message = client.messages.create(
         model="claude-sonnet-4-5",
