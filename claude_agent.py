@@ -428,7 +428,8 @@ Page: {p['url']}{retry_note}
         if ref:
             rich = "✅ Google Rich Result" if ref["google_rich_result"] else "❌ No rich result"
             req = ref["required_properties"] or "not specified"
-            schema_ref_context += f"\n{schema_type}: {rich} | Required: {req}"
+            rec = ref["recommended_properties"] or "not specified"
+            schema_ref_context += f"\n{schema_type}: {rich} | Required: {req} | Recommended: {rec}"
     if schema_ref_context:
         schema_ref_context = "\nSCHEMA REFERENCE (from Google documentation):" + schema_ref_context + "\n"
 
@@ -469,6 +470,14 @@ Structure — include ONLY these sections:
      (e.g. in both Executive Summary AND Minor Observations, or in both Schemas to Implement AND Minor Observations)
    - If found: flag as: "[page URL]: '[issue description]' appears in both [section A] and [section B] — should appear in Minor Observations only"
    - If no such issues found: omit this section entirely
+6. heading_2: "Google Requirements Validation"
+   - Use the SCHEMA REFERENCE block above to validate every recommended @type across all pages
+   - For each recommended @type that appears in SCHEMA REFERENCE:
+     - If a recommended property (inferred from the page reports) is NOT listed in the Required or Recommended properties for that type → flag as: "[SchemaType]: property '[X]' recommended but not found in stored Google requirements"
+     - If the SCHEMA REFERENCE entry for a type has both required and recommended = "not specified" → flag as: "[SchemaType]: Insufficient reference data in DB — manual verification needed"
+   - If a recommended @type does NOT appear in SCHEMA REFERENCE at all → flag as: "[SchemaType]: Not found in Schema Reference DB — unable to validate against Google requirements"
+   - If all recommended types are fully validated with no issues → one bulleted_list_item: "All recommended schema types validated against Google requirements"
+   - DO NOT invent requirements not present in the SCHEMA REFERENCE block
 ABSOLUTE RULES:
 - DO NOT write an opening summary or paragraph
 - DO NOT write positive confirmations ("X is correct", "Y is properly configured", "No issues here")
