@@ -71,6 +71,7 @@ def extract_recommended_schemas(blocks):
     """
     types_found = []
     ids_found = []
+    properties_per_type = {}
     for block in blocks:
         if not isinstance(block, dict):
             continue
@@ -88,6 +89,25 @@ def extract_recommended_schemas(blocks):
         for match in re.findall(r'"@id"\s*:\s*"([^"]+)"', content):
             if match not in ids_found:
                 ids_found.append(match)
+        if block_type == "code":
+            try:
+                parsed = json.loads(content)
+                items_to_check = []
+                if isinstance(parsed, list):
+                    for item in parsed:
+                        if isinstance(item, dict):
+                            items_to_check.extend(item.get("@graph", [item]))
+                elif isinstance(parsed, dict):
+                    items_to_check.extend(parsed.get("@graph", [parsed]))
+                for item in items_to_check:
+                    stype = item.get("@type")
+                    if isinstance(stype, list):
+                        stype = stype[0]
+                    if stype:
+                        props = [k for k in item.keys() if not k.startswith("@")]
+                        properties_per_type.setdefault(stype, set()).update(props)
+            except Exception:
+                pass
     # Fallback: no explicit @type patterns found (all-managed page like Yoast/RankMath)
     # Scan all text content for known Schema.org type names
     if not types_found:
@@ -106,8 +126,9 @@ def extract_recommended_schemas(blocks):
                         types_found.append(schema_type)
     # Filter out nested/sub-types — keep only top-level page schema types
     types_found = [t for t in types_found if t not in NESTED_SCHEMA_TYPES]
+    properties_per_type = {k: sorted(v) for k, v in properties_per_type.items()}
     print(f"    [extract_recommended_schemas] types: {types_found} | ids count: {len(ids_found)}")
-    return types_found, ids_found
+    return types_found, ids_found, properties_per_type
 
 
 def extract_faq_summary(json_ld):
@@ -251,12 +272,13 @@ EXISTING SCHEMAS (JSON-LD):
     raw = call_claude(build_prompt(5000))
     blocks = safe_parse(raw)
     if blocks is not None:
-        rec_types, rec_ids = extract_recommended_schemas(blocks)
+        rec_types, rec_ids, rec_props = extract_recommended_schemas(blocks)
         return {
             "blocks": blocks,
             "used_retry": False,
             "recommended_schemas": rec_types,
-            "recommended_ids": rec_ids
+            "recommended_ids": rec_ids,
+            "recommended_properties": rec_props
         }
     print(f"JSON parse error (last 300 chars): ...{raw[-300:]}")
     print("Retrying with simpler prompt...")
@@ -265,12 +287,13 @@ EXISTING SCHEMAS (JSON-LD):
     raw = call_claude(build_prompt(1000))
     blocks = safe_parse(raw)
     if blocks is not None:
-        rec_types, rec_ids = extract_recommended_schemas(blocks)
+        rec_types, rec_ids, rec_props = extract_recommended_schemas(blocks)
         return {
             "blocks": blocks,
             "used_retry": True,
             "recommended_schemas": rec_types,
-            "recommended_ids": rec_ids
+            "recommended_ids": rec_ids,
+            "recommended_properties": rec_props
         }
     raise ValueError(f"Both attempts failed. Last 300 chars: ...{raw[-300:]}")
 
@@ -411,15 +434,18 @@ def generate_qa_report(page_summaries, project, credits_summary=None, total_scra
     for p in page_summaries:
         rec_types = ", ".join(p.get("recommended_schemas", [])) or "none extracted"
         rec_ids = "\n    ".join(p.get("recommended_ids", [])) or "none extracted"
+        rec_props = p.get("recommended_properties", {})
         retry_note = " ⚠️ [partial analysis]" if p.get("used_retry") else ""
-        pages_data += f"""
-Page: {p['url']}{retry_note}
-  Type: {p['page_type']} | Level: {p['level']}
-  Recommended @types:
-    {rec_types}
-  Recommended @ids:
-    {rec_ids}
-"""
+        props_lines = ""
+        for stype in p.get("recommended_schemas", []):
+            props = rec_props.get(stype, [])
+            props_str = ", ".join(props) if props else "(managed — not extracted)"
+            props_lines += f"\n    {stype}: {props_str}"
+        pages_data += f"""Page: {p['url']}{retry_note}
+    Type: {p['page_type']} | Level: {p['level']}
+    Recommended @types:    {rec_types}
+    Recommended @ids:    {rec_ids}
+    Properties in recommended code:{props_lines}"""
     # Build schema reference context for QA validation
     all_schema_types = set()
     for p in page_summaries:
@@ -488,11 +514,11 @@ Structure — include ONLY these sections:
    - For each recommended @type, determine its icon from SCHEMA REFERENCE (⭐🤖 / ⭐ / 🤖) and apply the matching rule:
 
     VALIDATION PROCESS — follow these steps FOR EACH @type:
-    STEP 1: Locate all page reports that recommend this @type. Read the actual JSON-LD code blocks in those reports.
-    STEP 2: Check whether each required/recommended property from SCHEMA REFERENCE physically appears in that JSON-LD code.
-    STEP 3: If the property EXISTS anywhere in the JSON-LD code → it is NOT missing → mark as OK.
-            If the property is GENUINELY ABSENT from all JSON-LD code blocks → flag it.
-    DO NOT flag a property based on memory or assumptions — only based on what you read in the JSON-LD blocks.
+    STEP 1: Find the @type in PAGES DATA above. Read the "Properties in recommended code" list for that type.
+    STEP 2: Check whether each required/recommended property from SCHEMA REFERENCE appears in that list.
+    STEP 3: If the property EXISTS in the list → it is NOT missing → do NOT flag it.
+            If the property is GENUINELY ABSENT from the list → flag it.
+    DO NOT flag a property based on memory or assumptions — only based on "Properties in recommended code" above.
 
     ROWS 1-2 (⭐🤖, Google=Required): after STEP 1-3, if absent → "[icon] [SchemaType] ⚠️ Missing required: [property]"
     ROWS 3-4 (⭐🤖, Google=Recommended): after STEP 1-3, if absent → "[icon] [SchemaType] Note: Missing recommended: [property]"
@@ -502,7 +528,7 @@ Structure — include ONLY these sections:
     ROW 8 (🤖, Google=empty, Schema.org=Recommended): after STEP 1-3, if absent → "🤖 [SchemaType]: Missing recommended per Schema.org: [property]"
 
    - If a type is not found in SCHEMA REFERENCE → "[SchemaType]: Not found in Schema Reference DB — unable to validate"
-   - If no issues found for a type → write one bullet: "[icon] [SchemaType]: OK"
+   - If no issues found for a type → skip it entirely, do NOT write anything
    - After all per-type bullets, if ANY 🤖 types exist, add:
      heading_3: "Note on Schema.org / AI Value"
      paragraph: "Schema types marked 🤖 have no Google Rich Result requirements but are part of the Schema.org standard. They contribute to entity recognition and may influence how AI systems (Google AI Overview, ChatGPT, Perplexity) understand and surface this content."
