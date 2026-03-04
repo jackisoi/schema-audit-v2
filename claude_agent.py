@@ -488,15 +488,19 @@ Structure — include ONLY these sections:
    - Use the SCHEMA REFERENCE block above to validate every recommended @type across all pages
    - For each recommended @type, determine its icon from SCHEMA REFERENCE (⭐🤖 / ⭐ / 🤖) and apply the matching rule:
 
-   IMPORTANT: "Missing" means the property is absent from the RECOMMENDED schema code in the page reports.
-If the recommended code for a schema type includes the required property → mark as OK, do NOT flag it.
-Only flag a property if it is genuinely not present in the tool's own recommended implementation.
-   ROWS 1-2 (⭐🤖, Google=Required): Missing Google required property → "[icon] [SchemaType] ⚠️ Missing required: [property]"
-   ROWS 3-4 (⭐🤖, Google=Recommended): Missing Google recommended property → "[icon] [SchemaType] Note: Missing recommended: [property]"
-   ROW 5 (⭐, Google=Required, Schema.org=empty): Missing Google required → "[icon] [SchemaType] ⚠️ Missing required: [property]"
-   ROW 6 (⭐, Google=Recommended, Schema.org=empty): Missing Google recommended → "[icon] [SchemaType] Note: Missing recommended: [property]"
-   ROW 7 (🤖, Google=empty, Schema.org=Required): Missing Schema.org required → "🤖 [SchemaType]: Missing required per Schema.org: [property]"
-   ROW 8 (🤖, Google=empty, Schema.org=Recommended): Missing Schema.org recommended → "🤖 [SchemaType]: Missing recommended per Schema.org: [property]"
+    VALIDATION PROCESS — follow these steps FOR EACH @type:
+    STEP 1: Locate all page reports that recommend this @type. Read the actual JSON-LD code blocks in those reports.
+    STEP 2: Check whether each required/recommended property from SCHEMA REFERENCE physically appears in that JSON-LD code.
+    STEP 3: If the property EXISTS anywhere in the JSON-LD code → it is NOT missing → mark as OK.
+            If the property is GENUINELY ABSENT from all JSON-LD code blocks → flag it.
+    DO NOT flag a property based on memory or assumptions — only based on what you read in the JSON-LD blocks.
+
+    ROWS 1-2 (⭐🤖, Google=Required): after STEP 1-3, if absent → "[icon] [SchemaType] ⚠️ Missing required: [property]"
+    ROWS 3-4 (⭐🤖, Google=Recommended): after STEP 1-3, if absent → "[icon] [SchemaType] Note: Missing recommended: [property]"
+    ROW 5 (⭐, Google=Required, Schema.org=empty): after STEP 1-3, if absent → "[icon] [SchemaType] ⚠️ Missing required: [property]"
+    ROW 6 (⭐, Google=Recommended, Schema.org=empty): after STEP 1-3, if absent → "[icon] [SchemaType] Note: Missing recommended: [property]"
+    ROW 7 (🤖, Google=empty, Schema.org=Required): after STEP 1-3, if absent → "🤖 [SchemaType]: Missing required per Schema.org: [property]"
+    ROW 8 (🤖, Google=empty, Schema.org=Recommended): after STEP 1-3, if absent → "🤖 [SchemaType]: Missing recommended per Schema.org: [property]"
 
    - If a type is not found in SCHEMA REFERENCE → "[SchemaType]: Not found in Schema Reference DB — unable to validate"
    - If no issues found for a type → write one bullet: "[icon] [SchemaType]: OK"
