@@ -488,6 +488,9 @@ Structure — include ONLY these sections:
    - Use the SCHEMA REFERENCE block above to validate every recommended @type across all pages
    - For each recommended @type, determine its icon from SCHEMA REFERENCE (⭐🤖 / ⭐ / 🤖) and apply the matching rule:
 
+   IMPORTANT: "Missing" means the property is absent from the RECOMMENDED schema code in the page reports.
+If the recommended code for a schema type includes the required property → mark as OK, do NOT flag it.
+Only flag a property if it is genuinely not present in the tool's own recommended implementation.
    ROWS 1-2 (⭐🤖, Google=Required): Missing Google required property → "[icon] [SchemaType] ⚠️ Missing required: [property]"
    ROWS 3-4 (⭐🤖, Google=Recommended): Missing Google recommended property → "[icon] [SchemaType] Note: Missing recommended: [property]"
    ROW 5 (⭐, Google=Required, Schema.org=empty): Missing Google required → "[icon] [SchemaType] ⚠️ Missing required: [property]"
