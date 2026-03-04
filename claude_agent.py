@@ -308,13 +308,12 @@ PAGES SUMMARY:
 Write a comprehensive executive summary in Hebrew as a JSON array of Notion blocks.
 
 Structure:
-1. heading_2: "סיכום מנהלים — {project}"
-2. paragraph: ציון בריאות כולל (Poor / Fair / Good / Excellent) + הסבר קצר
-3. heading_2: "ממצאים לפי דף"
-4. bulleted_list_item per page: שם הדף + סכמות שנמצאו בלבד. אין לציין מה חסר בסעיף זה.
-5. heading_2: "סדר עדיפויות מומלץ"
-6. numbered_list_item: משימות לפי סדר חשיבות. סמן פריטים קריטיים עם ⚠️ בתחילת השורה. כל פריט: פעולה + הסבר של שורה אחת בלבד. אין לחזור על מידע שכבר מופיע בסעיפים אחרים.
-7. heading_2: "הערות כלליות" — הכלל רק אם יש מידע חדש שלא הוזכר בסדר העדיפויות. מקסימום 3 נקודות. כלול רק: המלצות על כלי ניהול סכמות (Yoast, Schema Pro וכו') + אימות ב-Rich Results Test. אם אין מה להוסיף: השמט סעיף זה לחלוטין.
+1. paragraph: ציון בריאות כולל (Poor / Fair / Good / Excellent) + הסבר קצר
+2. heading_2: "ממצאים לפי דף"
+3. bulleted_list_item per page: שם הדף + סכמות שנמצאו בלבד. אין לציין מה חסר בסעיף זה.
+4. heading_2: "סדר עדיפויות מומלץ"
+5. numbered_list_item: משימות לפי סדר חשיבות. סמן פריטים קריטיים עם ⚠️ בתחילת השורה. כל פריט: פעולה + הסבר של שורה אחת בלבד. אין לחזור על מידע שכבר מופיע בסעיפים אחרים.
+6. heading_2: "הערות כלליות"
 
 Rules:
 - All text in Hebrew
