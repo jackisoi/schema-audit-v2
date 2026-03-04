@@ -35,13 +35,7 @@ STEP 3 - Cross-page awareness:
 
 STEP 4 - Produce the report as a JSON array of Notion blocks:
 
-1. Executive Summary (heading_2 + paragraph)
-   Schema health score: Poor / Fair / Good / Excellent
-   What was found, what is missing, urgent issues with ⚠️
-   Do NOT mention accessibility, alt text, WCAG, or screen readers
-   Do NOT include any Minor Observations in this section
-
-2. Schemas to Implement (heading_2)
+1. Schemas to Implement (heading_2)
    One complete code block per schema — CUSTOM schemas only (MANAGED excluded)
    Label each block:
    - NEW — schema that does not exist on the page yet
@@ -49,7 +43,7 @@ STEP 4 - Produce the report as a JSON array of Notion blocks:
    If a schema replaces an existing one: provide the complete final version, not a diff
    This section combines both new schemas AND replacements — do NOT split into two sections
 
-3. [Platform name] Configuration (heading_2)
+2. [Platform name] Configuration (heading_2)
     If the platform is identified with certainty: use its name (e.g. "Yoast SEO Configuration", "RankMath Configuration").
     If the platform cannot be identified with certainty: use "SEO Plugin Configuration (plugin not identified)".
     Text instructions only — NO code blocks here
@@ -84,7 +78,7 @@ STEP 4 - Produce the report as a JSON array of Notion blocks:
 code as well. Failing to maintain it will cause a mismatch between what visitors see
 and what Google reads." 
 
-4. Action Items (heading_2)
+3. Action Items (heading_2)
    A numbered list of concrete tasks for the client to implement, in priority order.
    Each item must be a specific action — not a summary of what was already written.
    Examples: "Disable FAQPage in Yoast settings", "Add telephone to Organization in plugin",
@@ -94,7 +88,7 @@ and what Google reads."
    If all required actions are already covered in the sections above with no additional
    implementation steps needed: omit this section entirely.
 
-5. Minor Observations (heading_2) — OPTIONAL
+4. Minor Observations (heading_2) — OPTIONAL
    Include ONLY if there are non-critical cosmetic or low-priority issues.
    Examples: 15 separate SiteNavigationElement objects instead of ItemList,
    minor @id formatting inconsistencies that do not affect functionality.
