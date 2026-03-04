@@ -115,6 +115,7 @@ Rules:
 - Integer-type properties (numberOfItems, position, ratingValue, etc.) must be OMITTED entirely if the value is unknown — do NOT use a string placeholder for integer fields
 - Never write field values not explicitly present on the page
 - Never add starRating or aggregateRating unless confirmed on the page
+- telephone property must always use E.164 format: + followed by country code and digits only, no hyphens, no spaces, no parentheses (e.g. +972544556217, not +972-54-4556217)
 - Never include sameAs: [] — if social URLs unknown, omit sameAs entirely
 - Never recommend SearchAction unless a search input is confirmed on the page
 - If SearchAction exists in existing schemas but no search form detected: flag as issue to disable
