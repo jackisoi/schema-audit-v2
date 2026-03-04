@@ -429,10 +429,21 @@ Page: {p['url']}{retry_note}
     for schema_type in sorted(all_schema_types):
         ref = get_or_create_schema_reference(schema_type)
         if ref:
-            rich = "✅ Google Rich Result" if ref["google_rich_result"] else "❌ No rich result"
-            req = ref["required_properties"] or "not specified"
-            rec = ref["recommended_properties"] or "not specified"
-            schema_ref_context += f"\n{schema_type}: {rich} | Required: {req} | Recommended: {rec}"
+            g_req = ref.get("required_properties", "")
+            g_rec = ref.get("recommended_properties", "")
+            s_req = ref.get("required_schema_org", "")
+            s_rec = ref.get("recommended_schema_org", "")
+            has_google = bool(g_req or g_rec)
+            has_schema_org = bool(s_req or s_rec)
+            if has_google and has_schema_org:
+                icon = "⭐🤖"
+            elif has_google:
+                icon = "⭐"
+            else:
+                icon = "🤖"
+            schema_ref_context += f"\n{icon} {schema_type}"
+            schema_ref_context += f"\n  Google → Required: {g_req or 'empty'} | Recommended: {g_rec or 'empty'}"
+            schema_ref_context += f"\n  Schema.org → Required: {s_req or 'empty'} | Recommended: {s_rec or 'empty'}"
     if schema_ref_context:
         schema_ref_context = "\nSCHEMA REFERENCE (from Google documentation):" + schema_ref_context + "\n"
 
@@ -473,13 +484,22 @@ Structure — include ONLY these sections:
      (e.g. in both Executive Summary AND Minor Observations, or in both Schemas to Implement AND Minor Observations)
    - If found: flag as: "[page URL]: '[issue description]' appears in both [section A] and [section B] — should appear in Minor Observations only"
    - If no such issues found: omit this section entirely
-6. heading_2: "Google Requirements Validation"
+6. heading_2: "Schema Validation & AI/LLM Impact"
    - Use the SCHEMA REFERENCE block above to validate every recommended @type across all pages
-   - For each recommended @type that appears in SCHEMA REFERENCE:
-     - If a recommended property (inferred from the page reports) is NOT listed in the Required or Recommended properties for that type → flag as: "[SchemaType]: property '[X]' recommended but not found in stored Google requirements"
-     - If the SCHEMA REFERENCE entry for a type has both required and recommended = "not specified" → flag as: "[SchemaType]: Insufficient reference data in DB — manual verification needed"
-   - If a recommended @type does NOT appear in SCHEMA REFERENCE at all → flag as: "[SchemaType]: Not found in Schema Reference DB — unable to validate against Google requirements"
-   - If all recommended types are fully validated with no issues → one bulleted_list_item: "All recommended schema types validated against Google requirements"
+   - For each recommended @type, determine its icon from SCHEMA REFERENCE (⭐🤖 / ⭐ / 🤖) and apply the matching rule:
+
+   ROWS 1-2 (⭐🤖, Google=Required): Missing Google required property → "[icon] [SchemaType] ⚠️ Missing required: [property]"
+   ROWS 3-4 (⭐🤖, Google=Recommended): Missing Google recommended property → "[icon] [SchemaType] Note: Missing recommended: [property]"
+   ROW 5 (⭐, Google=Required, Schema.org=empty): Missing Google required → "[icon] [SchemaType] ⚠️ Missing required: [property]"
+   ROW 6 (⭐, Google=Recommended, Schema.org=empty): Missing Google recommended → "[icon] [SchemaType] Note: Missing recommended: [property]"
+   ROW 7 (🤖, Google=empty, Schema.org=Required): Missing Schema.org required → "🤖 [SchemaType]: Missing required per Schema.org: [property]"
+   ROW 8 (🤖, Google=empty, Schema.org=Recommended): Missing Schema.org recommended → "🤖 [SchemaType]: Missing recommended per Schema.org: [property]"
+
+   - If a type is not found in SCHEMA REFERENCE → "[SchemaType]: Not found in Schema Reference DB — unable to validate"
+   - If no issues found for a type → write one bullet: "[icon] [SchemaType]: OK"
+   - After all per-type bullets, if ANY 🤖 types exist, add:
+     heading_3: "Note on Schema.org / AI Value"
+     paragraph: "Schema types marked 🤖 have no Google Rich Result requirements but are part of the Schema.org standard. They contribute to entity recognition and may influence how AI systems (Google AI Overview, ChatGPT, Perplexity) understand and surface this content."
    - DO NOT invent requirements not present in the SCHEMA REFERENCE block
 ABSOLUTE RULES:
 - DO NOT write an opening summary or paragraph
