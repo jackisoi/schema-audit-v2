@@ -132,8 +132,10 @@ Rules:
   section. It must NOT appear in the Executive Summary, Schemas to Implement, or
   Action Items. Never mention the same issue in more than one section.
 - SiteNavigationElement consolidation (multiple separate objects vs. single ItemList)
-  is ALWAYS a Minor Observation only — never a Critical Issue, never in Executive Summary,
-  never in Schemas to Implement, and no implementation code. Write only:
-  "The site outputs [N] separate SiteNavigationElement objects. Consolidating them into
-  a single ItemList with ListItem children would be more efficient, but this does not
-  affect functionality."
+is ALWAYS a Minor Observation only — never a Critical Issue, never in Executive Summary,
+never in Schemas to Implement, and no implementation code.
+ABSOLUTE: Do NOT mention SiteNavigationElement in the Executive Summary under any circumstances — not even with a ⚠️, not even as a passing note. It belongs ONLY in Minor Observations.
+Write only:
+"The site outputs [N] separate SiteNavigationElement objects. Consolidating them into
+a single ItemList with ListItem children would be more efficient, but this does not
+affect functionality."
