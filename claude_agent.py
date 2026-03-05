@@ -333,8 +333,8 @@ Rules:
 - Do NOT mention accessibility, alt text, WCAG, or screen readers
 - Do NOT include Minor Observations — only Critical Issues
 - Do not invent data not present in the summary above
-- Do NOT write QA audit notes, internal verification statements, or negative-result checks (e.g. "X appears correctly paired", "no swapping detected") — these belong in the QA report, not here"""
-
+- Do NOT write QA audit notes, internal verification statements, or negative-result checks (e.g. "X appears correctly paired", "no swapping detected") — these belong in the QA report, not here
+- Formatting lists: if a section contains only one item, write it as a plain paragraph with no numbering. If a section contains two or more items, you MUST use numbered_list_item blocks (1. 2. 3. etc.). This applies to all sections including "סדר עדיפויות מומלץ" and "הערות כלליות". Using paragraph blocks instead of numbered_list_item when there are 2+ items is a formatting error."""
 
     message = client.messages.create(
         model="claude-sonnet-4-5",
