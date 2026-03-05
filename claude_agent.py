@@ -251,6 +251,8 @@ EXISTING SCHEMAS (JSON-LD):
     raw = call_claude(build_prompt(5000))
     blocks = safe_parse(raw)
     if blocks is not None:
+        if blocks and isinstance(blocks[0], list):
+            blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
         return {
             "blocks": blocks,
@@ -265,6 +267,8 @@ EXISTING SCHEMAS (JSON-LD):
     raw = call_claude(build_prompt(1000))
     blocks = safe_parse(raw)
     if blocks is not None:
+        if blocks and isinstance(blocks[0], list):
+            blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
         return {
             "blocks": blocks,
