@@ -132,7 +132,8 @@ Rules:
 - Any issue classified as Minor Observation must appear ONLY in the Minor Observations
 - SiteNavigationElement consolidation (multiple separate objects vs. single ItemList)
   is ALWAYS a Minor Observation only — never a Critical Issue, never in Executive Summary,
-  never in Schemas to Implement, and no implementation code. Write only:
+  never in Action Items, never in Schemas to Implement, and no implementation code.
+  Do NOT mention SiteNavigationElement anywhere else in the report. Write only:
   "The site outputs [N] separate SiteNavigationElement objects. Consolidating them into
   a single ItemList with ListItem children would be more efficient, but this does not
   affect functionality."
