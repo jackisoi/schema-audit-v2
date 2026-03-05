@@ -350,10 +350,8 @@ Rules:
         raw = raw.rsplit("```", 1)[0].strip()
     result = safe_parse(raw)
     if result is not None:
-        if credits_summary is not None:
-            result += build_credits_blocks(credits_summary, total_scraping_credits, claude_tokens or {})
         return result
-    raise ValueError(f"QA report parse failed. Last 300: ...{raw[-300:]}")
+    raise ValueError(f"Executive summary parse failed. Last 300: ...{raw[-300:]}")
 
 def build_credits_blocks(credits_summary, total_scraping_credits, claude_tokens):
     blocks = [{
