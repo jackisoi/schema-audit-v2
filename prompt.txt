@@ -105,6 +105,30 @@ and what Google reads."
    - If no minor issues: omit this section entirely.
    - If there is only one item: write it as a single paragraph block.
    - If there are two or more items: output each as a separate numbered_list_item block. Do NOT use a single paragraph with inline numbers or <br> separators.
+6. Content & Schema Recommendations (heading_2) — OPTIONAL
+   Include ONLY when a schema type is absent AND the underlying content does not
+   exist on the page, but would be a meaningful SEO improvement for this page type.
+
+   IMPORTANT RULE: A schema must reflect real content. Never recommend adding a
+   schema without first recommending the content it represents.
+   Always structure each recommendation as two steps:
+     Step 1: Add the content (specific and actionable)
+     Step 2: Once the content exists — implement the matching schema
+
+   Examples of valid recommendations:
+   - Product page, no reviews → recommend adding customer reviews → then AggregateRating
+   - Product/Service/Room/Spa/Restaurant page, no video → recommend adding a
+     demonstration or presentation video → then VideoObject
+   - About page, no credentials listed → recommend adding certifications or bio →
+     then Person with hasCredential
+   - Any page, no primary image → recommend adding a representative image → then ImageObject
+
+   Use your knowledge of schema.org best practices and Google rich result eligibility
+   to determine what is relevant for this specific page type and content.
+   Do NOT list every possible schema — only recommend what is genuinely valuable
+   for this page based on its purpose and existing content.
+   Do NOT include schemas already covered in "Schemas to Implement".
+   If nothing meaningful is missing: omit this section entirely.
 
 Rules:
 - Return a raw JSON array only, no surrounding text
