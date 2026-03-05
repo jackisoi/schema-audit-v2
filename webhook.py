@@ -139,14 +139,6 @@ def webhook():
                 "scraper_used": scan.get("scraper_used", "unknown"),
             })
 
-        print("  Generating executive summary...")
-        try:
-            summary_blocks = generate_executive_summary(page_summaries, project)
-            summary_url = write_executive_summary(project_page_id, project, summary_blocks)
-            print(f"  Executive summary: {summary_url}")
-        except Exception as e:
-            print(f"  Executive summary failed: {e}")
-            summary_url = None
 
         # Build credits summary — MUST be before the try block below
         credits_summary = [
@@ -159,6 +151,14 @@ def webhook():
         ]
         total_scraping_credits = sum(c["credits"] for c in credits_summary)
         claude_tokens_snapshot = dict(claude_usage)  # snapshot before QA call
+        print("  Generating executive summary...")
+        try:
+            summary_blocks = generate_executive_summary(page_summaries, project)
+            summary_url = write_executive_summary(project_page_id, project, summary_blocks)
+            print(f"  Executive summary: {summary_url}")
+        except Exception as e:
+            print(f"  Executive summary failed: {e}")
+            summary_url = None
 
         print("  Generating QA report...")
         try:
