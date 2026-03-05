@@ -40,6 +40,7 @@ STEP 4 - Produce the report as a JSON array of Notion blocks:
   What was found, what is missing, urgent issues with ⚠️
   Do NOT mention accessibility, alt text, WCAG, or screen readers
   Do NOT include any Minor Observations in this section
+  Do NOT mention SiteNavigationElement in this section under any circumstances
   Keep the paragraph under 60 words. Do not begin a sentence you cannot complete within this limit.
 
 2. Schemas to Implement (heading_2)
@@ -102,6 +103,8 @@ and what Google reads."
      Omit it entirely from this report. It will surface in the QA report.
    - Do NOT include anything from this section in the Executive Summary.
    - If no minor issues: omit this section entirely.
+   - If there is only one item: write it as a single paragraph block.
+   - If there are two or more items: output each as a separate numbered_list_item block. Do NOT use a single paragraph with inline numbers or <br> separators.
 
 Rules:
 - Return a raw JSON array only, no surrounding text
@@ -121,6 +124,7 @@ Rules:
 - If SearchAction exists in existing schemas but no search form detected: flag as issue to disable
 - Do NOT add FAQPage unless real Q&A content exists on the page
 - Do NOT add Organization or WebSite on non-homepage pages
+- LocalBusiness is a subtype of Organization. If an Organization @id is already established at Level 1 (e.g. #organization or #org), do NOT create a new LocalBusiness with a different @id on subpages. Instead, reference the existing Organization @id. If the business warrants LocalBusiness markup, recommend changing the @type to LocalBusiness on Level 1 only — not on subpages with a new separate @id.
 - If FAQPage exists: review all Q/A pairs for swapped content (answer in name field, question in
   text field). List any swapped pairs by number. Tell the client the exact count of questions.
   A swap is confirmed ONLY if there is clear structural evidence: the "name" field contains a long
