@@ -3,7 +3,7 @@ import json
 import re
 from urllib.parse import urlparse
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
 from schema_ref import get_or_create_schema_reference
 
 load_dotenv()
@@ -11,9 +11,9 @@ load_dotenv()
 with open("prompt.txt", "r", encoding="utf-8") as f:
     PROMPT_TEMPLATE = f.read()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 MODEL_NAME = "gemini-1.5-flash"
+
 
 SYSTEM_PROMPT = (
     "You are a Schema.org structured data expert and a JSON API. "
@@ -58,12 +58,14 @@ NESTED_SCHEMA_TYPES = {
 
 
 def _call_gemini(prompt_text):
-    """Call Gemini API and return raw text response."""
-    model = genai.GenerativeModel(
-        model_name=MODEL_NAME,
-        system_instruction=SYSTEM_PROMPT
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=prompt_text,
+        config={
+            "system_instruction": SYSTEM_PROMPT,
+            "max_output_tokens": 8000,
+        }
     )
-    response = model.generate_content(prompt_text)
     if hasattr(response, "usage_metadata"):
         ai_usage["input_tokens"]  += response.usage_metadata.prompt_token_count or 0
         ai_usage["output_tokens"] += response.usage_metadata.candidates_token_count or 0
