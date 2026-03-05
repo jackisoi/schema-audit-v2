@@ -101,6 +101,24 @@ def webhook():
                 notion.blocks.children.append(project_page_id, children=blocked_blocks)
                 return jsonify({"status": "blocked", "project": project, "url": url})
 
+            if scan.get("scrape_failed"):
+                print(f"  ⚠️ Scrape failed for {url} — skipping analysis")
+                page_summaries.append({
+                    "url": url,
+                    "level": level,
+                    "page_type": page_type,
+                    "scrape_failed": True,
+                    "used_retry": False,
+                    "recommended_schemas": [],
+                    "recommended_ids": [],
+                    "schemas_found": [],
+                    "schema_ids": [],
+                    "content_analysis": {},
+                    "scraper_used": "failed",
+                })
+                results.append({"url": url, "notion": None})
+                continue
+
             print(f"  Analyzing: {url}")
             result = analyze_with_scan(
                 scan, level, page_type, project,

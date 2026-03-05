@@ -303,11 +303,14 @@ def generate_executive_summary(page_summaries, project):
   FAQ: {faq_val}
 """
 
+    failed_pages = [p["url"] for p in page_summaries if p.get("scrape_failed")]
     retry_warning = ""
     if retry_pages:
         retry_callout_line = ", ".join(retry_pages)
         retry_warning = f"\n⚠️ הערה: הדפים הבאים נותחו עם נתונים חלקיים (retry mode):\n{retry_callout_line}"
-
+    if failed_pages:
+        failed_line = ", ".join(failed_pages)
+        retry_warning += f"\n⚠️ הערה: הדפים הבאים לא נותחו כלל בשל בעיות גישה (timeout):\n{failed_line}"
     prompt = f"""Project: {project}
 Total pages analyzed: {len(page_summaries)}
 

@@ -95,15 +95,22 @@ def fetch_html(url):
         print(f"    [scraper] No SCRAPINGBEE_API_KEY set, skipping ScrapingBee...")
 
     print(f"    [scraper] Falling back to Playwright: {url}")
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            args=["--no-sandbox", "--disable-blink-features=AutomationControlled"]
-        )
-        page = browser.new_page()
-        page.goto(url, wait_until="networkidle", timeout=30000)
-        html = page.content()
-        browser.close()
-        return html, "playwright"
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                args=["--no-sandbox", "--disable-blink-features=AutomationControlled"]
+            )
+            page = browser.new_page()
+            try:
+                page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            except Exception:
+                page.goto(url, wait_until="commit", timeout=60000)
+            html = page.content()
+            browser.close()
+            return html, "playwright"
+    except Exception as e:
+        print(f"    [scraper] Playwright failed: {e}")
+        return None, "failed"
 
 
 def extract_structured_data(html, url):
@@ -198,6 +205,15 @@ def analyze_content(html):
 
 def scan_page(url):
     html, scraper_used = fetch_html(url)
+    if html is None or scraper_used == "failed":
+        return {
+            "url": url,
+            "scraper_used": "failed",
+            "scrape_failed": True,
+            "structured_data": {"json-ld": [], "microdata": [], "rdfa": []},
+            "content_analysis": {},
+            "page_text": {}
+        }
     return {
         "url": url,
         "scraper_used": scraper_used,
