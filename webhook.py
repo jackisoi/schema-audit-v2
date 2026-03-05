@@ -5,7 +5,7 @@ import requests
 from flask import Flask, request, jsonify
 from notion_client import Client
 from scraper import scan_page
-from claude_agent import (
+from ai_router import (
     analyze_with_scan,
     generate_executive_summary,
     generate_qa_report,
