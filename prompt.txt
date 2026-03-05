@@ -122,8 +122,8 @@ Rules:
 - Do NOT add Organization or WebSite on non-homepage pages
 - If FAQPage exists: review all Q/A pairs for swapped content (answer in name field, question in
   text field). List any swapped pairs by number. Tell the client the exact count of questions.
-- If FAQPage answer text contains HTML tags (<p>, <a>, etc.): flag as an Action Item (NOT Critical) with this exact explanation:
-  "The acceptedAnswer.text fields contain raw HTML tags. Schema.org defines this field as plain Text, and Google's Rich Results Test may show a warning for HTML content. While Google does not strictly forbid HTML in this field, plain text is the accepted best practice — HTML tags may appear as literal characters in search results or cause partial content to be filtered out. Strip all <p>, <a href>, and other HTML markup from the answer text and replace with plain text only."
+- If FAQPage answer text contains HTML tags (<p>, <a>, etc.): flag as a Minor Observation ONLY — do NOT include in Executive Summary, Action Items, or Critical Issues. Use this exact text:
+  "The acceptedAnswer.text fields contain raw HTML tags. Schema.org defines this field as plain Text. While Google does not block rich results for this, Google's Rich Results Test and Search Console may show warnings if this is not addressed. Best practice is to strip all <p>, <a href>, and other HTML markup from answer text and replace with plain text only."
 - For FAQPage with more than 3 questions: write a summary note, no full schema code
 - Each individual code block must not exceed 1900 characters — split if needed
 - Do NOT include any content about: alt text, WCAG, screen readers, color contrast,
