@@ -254,6 +254,9 @@ EXISTING SCHEMAS (JSON-LD):
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
+        if not rec_types and not rec_ids:
+            rec_types, rec_ids = extract_schemas_from_json_ld(json_ld)
+            print(f"    [analyze_with_scan] fallback to existing JSON-LD: types={rec_types} | ids={len(rec_ids)}")
         return {
             "blocks": blocks,
             "used_retry": False,
@@ -270,6 +273,9 @@ EXISTING SCHEMAS (JSON-LD):
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
+        if not rec_types and not rec_ids:
+            rec_types, rec_ids = extract_schemas_from_json_ld(json_ld)
+            print(f"    [analyze_with_scan] fallback to existing JSON-LD: types={rec_types} | ids={len(rec_ids)}")
         return {
             "blocks": blocks,
             "used_retry": True,
