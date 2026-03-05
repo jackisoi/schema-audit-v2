@@ -149,6 +149,9 @@ Rules:
 - Do NOT add FAQPage unless real Q&A content exists on the page
 - Do NOT add Organization or WebSite on non-homepage pages
 - LocalBusiness is a subtype of Organization. If an Organization @id is already established at Level 1 (e.g. #organization or #org), do NOT create a new LocalBusiness with a different @id on subpages. Instead, reference the existing Organization @id. If the business warrants LocalBusiness markup, recommend changing the @type to LocalBusiness on Level 1 only — not on subpages with a new separate @id.
+- CRITICAL: If the "name" field ends with "?" — it IS a question. Do NOT flag as swapped
+  under any circumstances, regardless of what the acceptedAnswer.text contains or how
+  it is formatted.
 - If FAQPage exists: review all Q/A pairs for swapped content (answer in name field, question in
   text field). List any swapped pairs by number. Tell the client the exact count of questions.
   A swap is confirmed ONLY if there is clear structural evidence: the "name" field contains a long
