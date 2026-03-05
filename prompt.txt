@@ -128,9 +128,8 @@ Rules:
 - Each individual code block must not exceed 1900 characters — split if needed
 - Do NOT include any content about: alt text, WCAG, screen readers, color contrast,
   aria labels, keyboard navigation, or any other accessibility topic
+- Formatting lists: if a section contains only one item, write it as a plain paragraph with no numbering. If a section contains two or more items, use a numbered list and add an empty line after each item.
 - Any issue classified as Minor Observation must appear ONLY in the Minor Observations
-  section. It must NOT appear in the Executive Summary, Schemas to Implement, or
-  Action Items. Never mention the same issue in more than one section.
 - SiteNavigationElement consolidation (multiple separate objects vs. single ItemList)
   is ALWAYS a Minor Observation only — never a Critical Issue, never in Executive Summary,
   never in Schemas to Implement, and no implementation code. Write only:
