@@ -123,13 +123,17 @@ Rules:
 - Do NOT add Organization or WebSite on non-homepage pages
 - If FAQPage exists: review all Q/A pairs for swapped content (answer in name field, question in
   text field). List any swapped pairs by number. Tell the client the exact count of questions.
+  A swap is confirmed ONLY if there is clear structural evidence: the "name" field contains a long
+  explanatory text (clearly an answer body) while the "acceptedAnswer.text" field contains a short
+  interrogative phrase ending with "?". Do NOT flag as swapped based on assumption or uncertainty.
+  If in doubt, do not flag.
 - If FAQPage answer text contains HTML tags (<p>, <a>, etc.): flag as a Minor Observation ONLY — do NOT include in Executive Summary, Action Items, or Critical Issues. Use this exact text:
   "The acceptedAnswer.text fields contain raw HTML tags. Schema.org defines this field as plain Text. While Google does not block rich results for this, Google's Rich Results Test and Search Console may show warnings if this is not addressed. Best practice is to strip all <p>, <a href>, and other HTML markup from answer text and replace with plain text only."
 - For FAQPage with more than 3 questions: write a summary note, no full schema code
 - Each individual code block must not exceed 1900 characters — split if needed
 - Do NOT include any content about: alt text, WCAG, screen readers, color contrast,
   aria labels, keyboard navigation, or any other accessibility topic
-- Formatting lists: if a section contains only one item, write it as a plain paragraph with no numbering. If a section contains two or more items, you MUST use a numbered list (1. 2. 3. etc.) and add an empty line after each item. This applies to ALL sections: Action Items, Minor Observations, and any other multi-item section. Using paragraph format or line breaks instead of a numbered list when there are 2+ items is a formatting error.
+- Formatting lists: if a section contains only one item, write it as a plain paragraph block with no numbering. If a section contains two or more items, you MUST output each item as a separate numbered_list_item block (not inline numbers inside a paragraph block, not <br> separators). This applies to ALL sections: Action Items, Minor Observations, and any other multi-item section. Using a single paragraph block with inline numbers or <br> separators instead of separate numbered_list_item blocks is a formatting error.
 - Any issue classified as Minor Observation must appear ONLY in the Minor Observations
 - SiteNavigationElement consolidation (multiple separate objects vs. single ItemList)
   is ALWAYS a Minor Observation only — never a Critical Issue, never in Executive Summary,
