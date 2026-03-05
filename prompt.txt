@@ -36,10 +36,11 @@ STEP 3 - Cross-page awareness:
 STEP 4 - Produce the report as a JSON array of Notion blocks:
 
 1. Executive Summary (heading_2 + paragraph)
-   Schema health score: Poor / Fair / Good / Excellent
-   What was found, what is missing, urgent issues with ⚠️
-   Do NOT mention accessibility, alt text, WCAG, or screen readers
-   Do NOT include any Minor Observations in this section
+  Schema health score: Poor / Fair / Good / Excellent
+  What was found, what is missing, urgent issues with ⚠️
+  Do NOT mention accessibility, alt text, WCAG, or screen readers
+  Do NOT include any Minor Observations in this section
+  Keep the paragraph under 60 words. Do not begin a sentence you cannot complete within this limit.
 
 2. Schemas to Implement (heading_2)
    One complete code block per schema — CUSTOM schemas only (MANAGED excluded)
@@ -63,7 +64,7 @@ STEP 4 - Produce the report as a JSON array of Notion blocks:
      instruct to disable SearchAction in plugin settings.
    If no managed schemas exist on this page: omit this section entirely
 
-   After all text instructions, add:
+   After all text instructions, add the Complete Implementation Code block ONLY IF section 2 contains at least one custom schema. If section 2 states "No custom schemas are required", omit the Complete Implementation Code block entirely — do NOT include any JSON-LD code in section 3.
    heading_3: "Complete Implementation Code"
    paragraph: "This block replaces ALL required schemas for this page. Paste it into your site's <head> section via a custom code injection plugin. Before publishing: fill in all // REQUIRED fields and adjust any dynamic variables (e.g. page-specific URLs, names, dates) to match the actual content shown to visitors. You are responsible for verifying all values before going live."
    ONE single code block (language: html) combining ALL schemas from section 2.
@@ -128,7 +129,7 @@ Rules:
 - Each individual code block must not exceed 1900 characters — split if needed
 - Do NOT include any content about: alt text, WCAG, screen readers, color contrast,
   aria labels, keyboard navigation, or any other accessibility topic
-- Formatting lists: if a section contains only one item, write it as a plain paragraph with no numbering. If a section contains two or more items, use a numbered list and add an empty line after each item.
+- Formatting lists: if a section contains only one item, write it as a plain paragraph with no numbering. If a section contains two or more items, you MUST use a numbered list (1. 2. 3. etc.) and add an empty line after each item. This applies to ALL sections: Action Items, Minor Observations, and any other multi-item section. Using paragraph format or line breaks instead of a numbered list when there are 2+ items is a formatting error.
 - Any issue classified as Minor Observation must appear ONLY in the Minor Observations
 - SiteNavigationElement consolidation (multiple separate objects vs. single ItemList)
   is ALWAYS a Minor Observation only — never a Critical Issue, never in Executive Summary,
