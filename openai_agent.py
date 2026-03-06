@@ -363,7 +363,7 @@ Rules:
     raw    = _call_openai(prompt)
     result = safe_parse(raw)
     if result is not None:
-        return result
+        return _normalize_blocks(result)
     raise ValueError(f"Executive summary parse failed. Last 300: ...{raw[-300:]}")
 
 
@@ -472,8 +472,9 @@ ABSOLUTE RULES:
     raw    = _call_openai(prompt)
     result = safe_parse(raw)
     if result is not None:
+        result = _normalize_blocks(result)
         if credits_summary is not None:
-            result += build_credits_blocks(credits_summary, total_scraping_credits, claude_tokens or {})
+            result += build_credits_blocks(credits_summary, total_scraping_credits, tokens)
         return result
     raise ValueError(f"QA report parse failed. Last 300: ...{raw[-300:]}")
 
