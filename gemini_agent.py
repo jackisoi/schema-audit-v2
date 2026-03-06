@@ -88,7 +88,18 @@ def _sanitize_blocks(blocks):
                     if key not in VALID_RT_KEYS:
                         del rt[key]
                 valid_rt.append(rt)
-            code_inner["rich_text"] = valid_rt
+            # Split content chunks exceeding 2000 chars
+            MAX_CONTENT = 1900
+            split_rt = []
+            for rt in valid_rt:
+                content = rt.get("text", {}).get("content", "")
+                if len(content) <= MAX_CONTENT:
+                    split_rt.append(rt)
+                else:
+                    chunks = [content[i:i+MAX_CONTENT] for i in range(0, len(content), MAX_CONTENT)]
+                    for chunk in chunks:
+                        split_rt.append({"type": "text", "text": {"content": chunk}})
+            code_inner["rich_text"] = split_rt
 
     # 3. Sanitize rich_text in all block types — fix missing/extra keys in text objects
     for b in blocks:
