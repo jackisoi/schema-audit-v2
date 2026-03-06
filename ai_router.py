@@ -6,12 +6,14 @@ if AI_PROVIDER == "gemini":
     from gemini_agent import (
         analyze_with_scan,
         generate_executive_summary,
-        generate_qa_report,
+        generate_qa_report as _gemini_qa,
         extract_recommended_schemas,
         extract_schemas_from_json_ld,
         ai_usage as claude_usage,
         SCRAPER_CREDITS,
     )
+    def generate_qa_report(*args, claude_tokens=None, ai_tokens=None, **kwargs):
+        return _gemini_qa(*args, ai_tokens=claude_tokens or ai_tokens, **kwargs)
     print("[ai_router] Using provider: Gemini")
 else:
     from claude_agent import (
