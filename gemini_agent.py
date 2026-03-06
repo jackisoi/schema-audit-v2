@@ -254,6 +254,11 @@ EXISTING SCHEMAS (JSON-LD):
     blocks = safe_parse(raw)
     if blocks is not None:
         blocks = [b for b in blocks if isinstance(b, dict) and b.get("type") and b.get(b["type"]) is not None]
+        for b in blocks:
+            if isinstance(b, dict) and b.get("type") == "code":
+                for rt in b.get("code", {}).get("rich_text", []):
+                    if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
+                        rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
@@ -275,6 +280,11 @@ EXISTING SCHEMAS (JSON-LD):
     blocks = safe_parse(raw)
     if blocks is not None:
         blocks = [b for b in blocks if isinstance(b, dict) and b.get("type") and b.get(b["type"]) is not None]
+        for b in blocks:
+            if isinstance(b, dict) and b.get("type") == "code":
+                for rt in b.get("code", {}).get("rich_text", []):
+                    if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
+                        rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
