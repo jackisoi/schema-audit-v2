@@ -97,6 +97,8 @@ def _sanitize_blocks(blocks):
                     for rt in inner[key]:
                         if not isinstance(rt, dict):
                             continue
+                        if rt.get("type") not in ("text", "mention", "equation", None):
+                            rt["type"] = "text"
                         if not isinstance(rt.get("text"), dict):
                             rt["text"] = {"content": ""}
                         else:
