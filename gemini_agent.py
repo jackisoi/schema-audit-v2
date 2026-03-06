@@ -14,7 +14,7 @@ with open("prompt.txt", "r", encoding="utf-8") as f:
 client = genai.Client(
     api_key=os.getenv("GEMINI_API_KEY")
 )
-MODEL_NAME = "gemini-2.5-flash"
+MODEL_NAME = "gemini-2.0-flash"
 
 SYSTEM_PROMPT = (
     "You are a Schema.org structured data expert and a JSON API. "
