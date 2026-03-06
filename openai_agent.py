@@ -12,7 +12,7 @@ with open("prompt.txt", "r", encoding="utf-8") as f:
     PROMPT_TEMPLATE = f.read()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-MODEL_NAME = "gpt-4o-mini"
+MODEL_NAME = "gpt-4o"
 SYSTEM_PROMPT = "You are a Schema.org structured data expert and a JSON API. Return only a raw JSON array of Notion blocks. No markdown fences, no surrounding text."
 
 claude_usage = {"input_tokens": 0, "output_tokens": 0}
