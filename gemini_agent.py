@@ -16,7 +16,6 @@ client = genai.Client(
 )
 MODEL_NAME = "gemini-2.5-flash"
 
-
 SYSTEM_PROMPT = (
     "You are a Schema.org structured data expert and a JSON API. "
     "Return only a raw JSON array of Notion blocks. "
@@ -50,13 +49,60 @@ KNOWN_SCHEMA_TYPES = {
     "HowTo", "Recipe", "Review", "AggregateRating", "PostalAddress",
     "GeoCoordinates", "LodgingBusiness", "FoodEstablishment", "Offer"
 }
-
 NESTED_SCHEMA_TYPES = {
     "Country", "OfferCatalog", "Offer", "AggregateOffer", "Question", "Answer",
     "PostalAddress", "GeoCoordinates", "ContactPoint", "OpeningHoursSpecification",
     "MonetaryAmount", "PropertyValue", "ListItem", "ItemList",
     "EntryPoint", "SearchAction", "ReadAction", "ImageObject"
 }
+
+RICH_TEXT_BLOCKS = {
+    "heading_1", "heading_2", "heading_3", "heading_4", "paragraph",
+    "bulleted_list_item", "numbered_list_item", "quote", "toggle", "to_do", "callout"
+}
+
+
+def _sanitize_blocks(blocks):
+    """Sanitize Gemini-generated blocks before sending to Notion."""
+    # 1. Filter blocks missing their content object
+    blocks = [
+        b for b in blocks
+        if isinstance(b, dict) and b.get("type") and b.get(b["type"]) is not None
+    ]
+
+    # 2. Sanitize code block rich_text — strip extra keys from text object
+    for b in blocks:
+        if isinstance(b, dict) and b.get("type") == "code":
+            for rt in b.get("code", {}).get("rich_text", []):
+                if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
+                    rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
+
+    # 3. Sanitize rich_text in all block types — fix missing/extra keys in text objects
+    for b in blocks:
+        if not isinstance(b, dict):
+            continue
+        block_type = b.get("type")
+        if block_type and isinstance(b.get(block_type), dict):
+            inner = b[block_type]
+            for key in ["rich_text", "text"]:
+                if isinstance(inner.get(key), list):
+                    for rt in inner[key]:
+                        if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
+                            if "content" not in rt["text"] or rt["text"]["content"] is None:
+                                rt["text"]["content"] = ""
+                            rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
+
+    # 4. Ensure rich_text exists in blocks that require it
+    for b in blocks:
+        if not isinstance(b, dict):
+            continue
+        block_type = b.get("type")
+        if block_type in RICH_TEXT_BLOCKS and isinstance(b.get(block_type), dict):
+            inner = b[block_type]
+            if "rich_text" not in inner or inner["rich_text"] is None:
+                inner["rich_text"] = [{"type": "text", "text": {"content": ""}}]
+
+    return blocks
 
 
 def _call_gemini(prompt_text):
@@ -191,23 +237,19 @@ def analyze_with_scan(scan_result, level, page_type, project, parent_context=Non
     json_ld = sd.get("json-ld", [])
     summarized = summarize_existing_schemas(json_ld)
     existing_schemas = json.dumps(summarized, ensure_ascii=False) if summarized else "None found"
-
     microdata = sd.get("microdata", [])
     microdata_section = ""
     if microdata:
         microdata_section = f"\nMICRODATA SCHEMAS:\n{json.dumps(microdata[:5], ensure_ascii=False)[:2000]}"
-
     rdfa = sd.get("rdfa", [])
     rdfa_section = ""
     if rdfa:
         rdfa_section = f"\nRDFA SCHEMAS:\n{json.dumps(rdfa[:5], ensure_ascii=False)[:2000]}"
-
     faq_items = extract_faq_summary(json_ld)
     faq_section = ""
     if faq_items:
         faq_section = f"\nFAQ CONTENT ({len(faq_items)} items — check for swapped Q/A):\n"
         faq_section += "\n".join(faq_items)
-
     content_summary = f"""H1: {ca.get('h1') or 'Not found'}
 H2s: {', '.join(ca.get('h2s', [])[:10]) or 'None'}
 Video: {'Yes' if ca.get('video') else 'No'}
@@ -215,12 +257,10 @@ Forms: {ca.get('forms') or 'None'}
 FAQ patterns: {'Yes' if ca.get('faq_patterns') else 'No'}
 Phone: {ca.get('contact_info', {}).get('phone') or 'Not found'}
 Email: {ca.get('contact_info', {}).get('email') or 'Not found'}"""
-
     page_text = pt.get("text") or ""
     path_parts = [p for p in urlparse(url).path.split('/') if p]
     is_subpage = len(path_parts) >= 2
     subpage_note = "YES - reference parent @id, do not redefine parent entity" if is_subpage else "NO - this is a top-level page"
-
     parent_section = ""
     if parent_context:
         parent_section = "\nRECOMMENDED SCHEMAS FROM PARENT PAGES:\n"
@@ -253,27 +293,9 @@ EXISTING SCHEMAS (JSON-LD):
     raw = _call_gemini(build_prompt(5000))
     blocks = safe_parse(raw)
     if blocks is not None:
-        blocks = [b for b in blocks if isinstance(b, dict) and b.get("type") and b.get(b["type"]) is not None]
-        for b in blocks:
-            if isinstance(b, dict) and b.get("type") == "code":
-                for rt in b.get("code", {}).get("rich_text", []):
-                    if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
-                        rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
-        for b in blocks:
-            if not isinstance(b, dict):
-                continue
-            block_type = b.get("type")
-            if block_type and isinstance(b.get(block_type), dict):
-                inner = b[block_type]
-                for key in ["rich_text", "text"]:
-                    if isinstance(inner.get(key), list):
-                        for rt in inner[key]:
-                            if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
-                                if "content" not in rt["text"] or rt["text"]["content"] is None:
-                                    rt["text"]["content"] = ""
-                                rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
+        blocks = _sanitize_blocks(blocks)
         rec_types, rec_ids = extract_recommended_schemas(blocks)
         if not rec_types and not rec_ids:
             rec_types, rec_ids = extract_schemas_from_json_ld(json_ld)
@@ -292,27 +314,9 @@ EXISTING SCHEMAS (JSON-LD):
     raw = _call_gemini(build_prompt(1000))
     blocks = safe_parse(raw)
     if blocks is not None:
-        blocks = [b for b in blocks if isinstance(b, dict) and b.get("type") and b.get(b["type"]) is not None]
-        for b in blocks:
-            if isinstance(b, dict) and b.get("type") == "code":
-                for rt in b.get("code", {}).get("rich_text", []):
-                    if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
-                        rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
-        for b in blocks:
-            if not isinstance(b, dict):
-                continue
-            block_type = b.get("type")
-            if block_type and isinstance(b.get(block_type), dict):
-                inner = b[block_type]
-                for key in ["rich_text", "text"]:
-                    if isinstance(inner.get(key), list):
-                        for rt in inner[key]:
-                            if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
-                                if "content" not in rt["text"] or rt["text"]["content"] is None:
-                                    rt["text"]["content"] = ""
-                                rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
+        blocks = _sanitize_blocks(blocks)
         rec_types, rec_ids = extract_recommended_schemas(blocks)
         if not rec_types and not rec_ids:
             rec_types, rec_ids = extract_schemas_from_json_ld(json_ld)
@@ -336,13 +340,11 @@ def generate_executive_summary(page_summaries, project):
         retry_note = " ⚠️ [נותח חלקית - retry]" if p.get("used_retry") else ""
         h1_val = ca.get('h1') or 'לא נמצא'
         faq_val = 'כן' if ca.get('faq_patterns') else 'לא'
-        pages_text += f"""
-דף: {p['url']}{retry_note}
+        pages_text += f"""דף: {p['url']}{retry_note}
   סוג: {p['page_type']} | רמה: {p['level']}
   H1: {h1_val}
   סכמות קיימות: {schemas}
   FAQ: {faq_val}"""
-
     failed_pages = [p["url"] for p in page_summaries if p.get("scrape_failed")]
     retry_warning = ""
     if retry_pages:
@@ -351,7 +353,6 @@ def generate_executive_summary(page_summaries, project):
     if failed_pages:
         failed_line = ", ".join(failed_pages)
         retry_warning += f"\n⚠️ הערה: הדפים הבאים לא נותחו כלל בשל בעיות גישה (timeout):\n{failed_line}"
-
     prompt = f"""Project: {project}
 Total pages analyzed: {len(page_summaries)}
 PAGES SUMMARY:
@@ -375,7 +376,6 @@ Rules:
 - Do not invent data not present in the summary above
 - Do NOT write QA audit notes, internal verification statements, or negative-result checks
 - Formatting lists: if a section contains only one item, write it as a plain paragraph with no numbering. If a section contains two or more items, you MUST use numbered_list_item blocks (1. 2. 3. etc.). This applies to all sections including "סדר עדיפויות מומלץ" and "הערות כלליות". Using paragraph blocks instead of numbered_list_item when there are 2+ items is a formatting error."""
-
     raw = _call_gemini(prompt)
     result = safe_parse(raw)
     if result is not None:
@@ -388,7 +388,6 @@ def build_credits_blocks(credits_summary, total_scraping_credits, ai_tokens):
         "object": "block", "type": "heading_2",
         "heading_2": {"rich_text": [{"type": "text", "text": {"content": "Run Credits Summary"}}]}
     }]
-
     # --- ScrapingBee ---
     blocks.append({
         "object": "block", "type": "heading_3",
@@ -408,14 +407,12 @@ def build_credits_blocks(credits_summary, total_scraping_credits, ai_tokens):
             "content": f"Total ScrapingBee credits used: {total_scraping_credits}"
         }}]}
     })
-
     # --- Gemini API ---
     input_t     = ai_tokens.get("input_tokens", 0)
     output_t    = ai_tokens.get("output_tokens", 0)
     input_cost  = round(input_t  / 1_000_000 * INPUT_COST_PER_M, 4)
     output_cost = round(output_t / 1_000_000 * OUTPUT_COST_PER_M, 4)
     total_cost  = round(input_cost + output_cost, 4)
-
     blocks.append({
         "object": "block", "type": "heading_3",
         "heading_3": {"rich_text": [{"type": "text", "text": {"content": f"Gemini API ({MODEL_NAME})"}}]}
@@ -447,12 +444,10 @@ def generate_qa_report(page_summaries, project, credits_summary=None, total_scra
         rec_types = ", ".join(p.get("recommended_schemas", [])) or "none extracted"
         rec_ids = "\n    ".join(p.get("recommended_ids", [])) or "none extracted"
         retry_note = " ⚠️ [partial analysis]" if p.get("used_retry") else ""
-        pages_data += f"""
-Page: {p['url']}{retry_note}
+        pages_data += f"""Page: {p['url']}{retry_note}
   Type: {p['page_type']} | Level: {p['level']}
   Recommended @types:    {rec_types}
   Recommended @ids:    {rec_ids}"""
-
     all_schema_types = set()
     for p in page_summaries:
         all_schema_types.update(p.get("recommended_schemas", []))
@@ -465,7 +460,6 @@ Page: {p['url']}{retry_note}
             schema_ref_context += f"\n{schema_type}: {rich} | Required: {req}"
     if schema_ref_context:
         schema_ref_context = "\nSCHEMA REFERENCE (from Google documentation):" + schema_ref_context + "\n"
-
     prompt = f"""Project: {project}
 Total pages: {len(page_summaries)}
 CONTEXT:
@@ -502,7 +496,6 @@ ABSOLUTE RULES:
 - DO NOT repeat any recommendation from individual page reports
 - ONLY flag genuine cross-page inconsistencies and uncertainties
 - Return raw JSON array of Notion blocks only, all text in English"""
-
     raw = _call_gemini(prompt)
     result = safe_parse(raw)
     if result is not None:
