@@ -167,6 +167,7 @@ def _call_gemini(prompt_text):
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1]
         raw = raw.rsplit("```", 1)[0].strip()
+    print(f"    [gemini] raw_len={len(raw)} | starts={raw[:50]!r}")
     return raw
 
 
