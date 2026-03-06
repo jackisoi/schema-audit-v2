@@ -118,7 +118,7 @@ def _sanitize_blocks(blocks):
         block_type = b.get("type")
         if block_type in RICH_TEXT_BLOCKS and isinstance(b.get(block_type), dict):
             inner = b[block_type]
-            if "rich_text" not in inner or inner["rich_text"] is None:
+            if not isinstance(inner.get("rich_text"), list):
                 inner["rich_text"] = [{"type": "text", "text": {"content": ""}}]
 
     return blocks
