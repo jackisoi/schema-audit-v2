@@ -64,6 +64,7 @@ RICH_TEXT_BLOCKS = {
 
 def _sanitize_blocks(blocks):
     """Sanitize Gemini-generated blocks before sending to Notion."""
+    print(f"    [sanitize] before: {len(blocks)} blocks")
     # 1. Filter blocks missing their content object
     blocks = [
         b for b in blocks
@@ -146,7 +147,7 @@ def _sanitize_blocks(blocks):
             )
         )
     ]
-
+    print(f"    [sanitize] after: {len(blocks)} blocks")
     return blocks
 
 
