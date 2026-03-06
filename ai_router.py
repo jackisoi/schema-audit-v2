@@ -26,3 +26,11 @@ else:
         SCRAPER_CREDITS,
     )
     print("[ai_router] Using provider: Anthropic (default)")
+
+def generate_text(prompt):
+    """Generate plain text using the active AI provider."""
+    if AI_PROVIDER == "gemini":
+        from gemini_agent import generate_text as _generate_text
+    else:
+        from claude_agent import generate_text as _generate_text
+    return _generate_text(prompt)

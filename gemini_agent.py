@@ -549,3 +549,11 @@ ABSOLUTE RULES:
         if credits_summary is not None:
             result += build_credits_blocks(credits_summary, total_scraping_credits, ai_tokens or {})
         return result
+
+def generate_text(prompt):
+    """Generate plain text using Gemini."""
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=prompt,
+    )
+    return response.text

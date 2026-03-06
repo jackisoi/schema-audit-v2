@@ -47,12 +47,9 @@ def lookup_schema_reference(schema_type):
 
 
 def generate_schema_reference_data(schema_type):
-    """Ask Claude to generate reference data for a schema type from its knowledge.
-    Import client lazily to avoid circular imports.
-    """
+    """Generate reference data for a schema type using the active AI provider."""
     try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+        from ai_router import generate_text
         prompt = f"""You are a Schema.org and Google Structured Data expert.
 For the schema type "{schema_type}", return a JSON object with these exact keys:
 {{
@@ -61,15 +58,11 @@ For the schema type "{schema_type}", return a JSON object with these exact keys:
   "recommended_properties": "comma-separated list of recommended properties per Google (empty string if none)",
   "google_docs_url": "https://developers.google.com/search/docs/appearance/structured-data/... (empty string if no Google docs page exists)",
   "schema_org_url": "https://schema.org/{schema_type}",
-  "source": "Claude Knowledge"
+  "source": "Gemini Knowledge"
 }}
 Return only the JSON object, no other text."""
-        message = client.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=600,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        raw = message.content[0].text.strip()
+
+        raw = generate_text(prompt).strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1]
             raw = raw.rsplit("```", 1)[0].strip()

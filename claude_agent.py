@@ -508,3 +508,14 @@ ABSOLUTE RULES:
             result += build_credits_blocks(credits_summary, total_scraping_credits, claude_tokens or {})
         return result
     raise ValueError(f"QA report parse failed. Last 300: ...{raw[-300:]}")
+
+def generate_text(prompt):
+    """Generate plain text using Claude."""
+    import anthropic
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    message = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=600,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return message.content[0].text
