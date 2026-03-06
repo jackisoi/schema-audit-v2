@@ -253,6 +253,7 @@ EXISTING SCHEMAS (JSON-LD):
     raw = _call_gemini(build_prompt(5000))
     blocks = safe_parse(raw)
     if blocks is not None:
+        blocks = [b for b in blocks if isinstance(b, dict) and b.get("type") and b.get(b["type"]) is not None]
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
@@ -273,6 +274,7 @@ EXISTING SCHEMAS (JSON-LD):
     raw = _call_gemini(build_prompt(1000))
     blocks = safe_parse(raw)
     if blocks is not None:
+        blocks = [b for b in blocks if isinstance(b, dict) and b.get("type") and b.get(b["type"]) is not None]
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
