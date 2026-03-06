@@ -164,6 +164,40 @@ def safe_parse(raw_text):
             return None
 
 
+def _normalize_blocks(blocks):
+    """Convert simplified OpenAI block format to proper Notion API format.
+    Handles: {"type": "heading_2", "text": "..."}
+    Converts to: {"type": "heading_2", "heading_2": {"rich_text": [...]}}
+    """
+    normalized = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        block_type = block.get("type")
+        if not block_type:
+            continue
+        # Already in proper Notion format
+        if block_type in block and isinstance(block[block_type], dict):
+            normalized.append(block)
+            continue
+        # Simplified format — convert it
+        text_content = block.get("text") or block.get("content") or ""
+        if isinstance(text_content, list):
+            # already rich_text-like list
+            rich_text = text_content
+        else:
+            rich_text = [{"type": "text", "text": {"content": str(text_content)}}] if text_content else []
+        inner = {"rich_text": rich_text}
+        if block_type == "code":
+            inner["language"] = block.get("language", "plain text")
+        normalized.append({
+            "object": "block",
+            "type": block_type,
+            block_type: inner
+        })
+    return normalized
+
+
 def analyze_with_scan(scan_result, level, page_type, project, parent_context=None):
     url     = scan_result["url"]
     sd      = scan_result["structured_data"]
@@ -227,6 +261,7 @@ EXISTING SCHEMAS (JSON-LD):
     raw    = _call_openai(build_prompt(5000))
     blocks = safe_parse(raw)
     if blocks is not None:
+        blocks = _normalize_blocks(blocks)
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
@@ -241,6 +276,7 @@ EXISTING SCHEMAS (JSON-LD):
     raw    = _call_openai(build_prompt(1000))
     blocks = safe_parse(raw)
     if blocks is not None:
+        blocks = _normalize_blocks(blocks)
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
