@@ -121,6 +121,21 @@ def _sanitize_blocks(blocks):
             if not isinstance(inner.get("rich_text"), list):
                 inner["rich_text"] = [{"type": "text", "text": {"content": ""}}]
 
+    # Step 5: Remove empty heading blocks
+    HEADING_BLOCKS = {"heading_1", "heading_2", "heading_3"}
+    blocks = [
+        b for b in blocks
+        if not (
+            isinstance(b, dict) and
+            b.get("type") in HEADING_BLOCKS and
+            not any(
+                rt.get("text", {}).get("content", "").strip()
+                for rt in b.get(b.get("type", ""), {}).get("rich_text", [])
+                if isinstance(rt, dict)
+            )
+        )
+    ]
+
     return blocks
 
 
