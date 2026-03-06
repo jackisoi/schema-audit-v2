@@ -74,14 +74,19 @@ def _sanitize_blocks(blocks):
     for b in blocks:
         if isinstance(b, dict) and b.get("type") == "code":
             code_inner = b.get("code", {})
+            VALID_RT_KEYS = {"type", "text", "annotations", "plain_text", "href"}
             valid_rt = []
             for rt in code_inner.get("rich_text", []):
                 if not isinstance(rt, dict):
                     continue
                 if rt.get("object") == "block":
-                    continue  # Gemini mistakenly placed a block object here
+                    continue
                 if isinstance(rt.get("text"), dict):
                     rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
+                # Strip any extra keys Gemini added to the rich_text item itself
+                for key in list(rt.keys()):
+                    if key not in VALID_RT_KEYS:
+                        del rt[key]
                 valid_rt.append(rt)
             code_inner["rich_text"] = valid_rt
 
