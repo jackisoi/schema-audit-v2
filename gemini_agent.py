@@ -95,7 +95,11 @@ def _sanitize_blocks(blocks):
             for key in ["rich_text", "text"]:
                 if isinstance(inner.get(key), list):
                     for rt in inner[key]:
-                        if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
+                        if not isinstance(rt, dict):
+                            continue
+                        if not isinstance(rt.get("text"), dict):
+                            rt["text"] = {"content": ""}
+                        else:
                             if "content" not in rt["text"] or rt["text"]["content"] is None:
                                 rt["text"]["content"] = ""
                             rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
