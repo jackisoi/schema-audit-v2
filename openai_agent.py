@@ -474,7 +474,7 @@ ABSOLUTE RULES:
     if result is not None:
         result = _normalize_blocks(result)
         if credits_summary is not None:
-            result += build_credits_blocks(credits_summary, total_scraping_credits, tokens)
+            result += build_credits_blocks(credits_summary, total_scraping_credits, claude_tokens)
         return result
     raise ValueError(f"QA report parse failed. Last 300: ...{raw[-300:]}")
 
