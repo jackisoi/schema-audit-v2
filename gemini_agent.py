@@ -209,6 +209,8 @@ def extract_recommended_schemas(blocks):
             continue
         block_type = block.get("type")
         inner = block.get(block_type, {})
+        if not isinstance(inner, dict):  
+            continue                      
         rich_text = inner.get("rich_text", [])
         content = "".join(
             rt.get("text", {}).get("content", "")
@@ -225,6 +227,8 @@ def extract_recommended_schemas(blocks):
         for block in blocks:
             block_type = block.get("type")
             inner = block.get(block_type, {})
+            if not isinstance(inner, dict):  
+            continue 
             rich_text = inner.get("rich_text", [])
             content = "".join(
                 rt.get("text", {}).get("content", "")
