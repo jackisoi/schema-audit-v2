@@ -259,6 +259,19 @@ EXISTING SCHEMAS (JSON-LD):
                 for rt in b.get("code", {}).get("rich_text", []):
                     if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
                         rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
+        for b in blocks:
+            if not isinstance(b, dict):
+                continue
+            block_type = b.get("type")
+            if block_type and isinstance(b.get(block_type), dict):
+                inner = b[block_type]
+                for key in ["rich_text", "text"]:
+                    if isinstance(inner.get(key), list):
+                        for rt in inner[key]:
+                            if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
+                                if "content" not in rt["text"] or rt["text"]["content"] is None:
+                                    rt["text"]["content"] = ""
+                                rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
@@ -285,6 +298,19 @@ EXISTING SCHEMAS (JSON-LD):
                 for rt in b.get("code", {}).get("rich_text", []):
                     if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
                         rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
+        for b in blocks:
+            if not isinstance(b, dict):
+                continue
+            block_type = b.get("type")
+            if block_type and isinstance(b.get(block_type), dict):
+                inner = b[block_type]
+                for key in ["rich_text", "text"]:
+                    if isinstance(inner.get(key), list):
+                        for rt in inner[key]:
+                            if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
+                                if "content" not in rt["text"] or rt["text"]["content"] is None:
+                                    rt["text"]["content"] = ""
+                                rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
