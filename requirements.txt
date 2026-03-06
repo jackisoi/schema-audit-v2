@@ -60,3 +60,4 @@ webencodings==0.5.1
 Werkzeug==3.1.6
 cloudscraper
 google-genai
+openai
