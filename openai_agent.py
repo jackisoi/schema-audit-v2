@@ -216,7 +216,13 @@ def _normalize_blocks(blocks):
             # Format 1: already proper Notion format
             if block_type in block and isinstance(block[block_type], dict):
                 if block_type in KNOWN_BLOCK_TYPES:
-                    return [block]
+                    inner = block[block_type]
+                    if "rich_text" in inner:
+                        return [block]  # פורמט תקין לחלוטין
+                    # inner קיים אבל חסר rich_text
+                    text_value = inner.get("text") or inner.get("content") or ""
+                    result = _make_block(block_type, text_value)
+                    return [result] if result else []
                 return []
 
             # Format 2: type + text/content/block_type-value
