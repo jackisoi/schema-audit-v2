@@ -61,11 +61,11 @@ NESTED_SCHEMA_TYPES = {
 
 
 def _call_gemini(prompt_text):
+    full_prompt = f"{SYSTEM_PROMPT}\n\n{prompt_text}"
     response = client.models.generate_content(
         model=MODEL_NAME,
-        contents=prompt_text,
+        contents=full_prompt,
         config={
-            "system_instruction": SYSTEM_PROMPT,
             "max_output_tokens": 8000,
         }
     )
