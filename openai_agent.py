@@ -164,37 +164,66 @@ def safe_parse(raw_text):
             return None
 
 
+KNOWN_BLOCK_TYPES = {
+    "paragraph", "heading_1", "heading_2", "heading_3",
+    "bulleted_list_item", "numbered_list_item", "to_do",
+    "toggle", "quote", "callout", "code", "divider",
+}
+
 def _normalize_blocks(blocks):
-    """Convert simplified OpenAI block format to proper Notion API format.
-    Handles: {"type": "heading_2", "text": "..."}
-    Converts to: {"type": "heading_2", "heading_2": {"rich_text": [...]}}
     """
+    Convert any OpenAI block format to proper Notion API format.
+    Handles 3 formats:
+      1. Proper: {"type": "X", "X": {"rich_text": [...]}}
+      2. Type+text: {"type": "X", "text": "..."} or {"content": "..."}
+      3. Multi-key (no type): {"heading_2": "Overview", "paragraph": "..."}
+    """
+    def _make_block(block_type, text_value):
+        if block_type not in KNOWN_BLOCK_TYPES:
+            return None
+        if isinstance(text_value, str):
+            rich_text = [{"type": "text", "text": {"content": text_value}}] if text_value else []
+        elif isinstance(text_value, list):
+            rich_text = text_value
+        else:
+            rich_text = []
+        inner = {"rich_text": rich_text}
+        if block_type == "code":
+            inner["language"] = "plain text"
+        return {"object": "block", "type": block_type, block_type: inner}
+
     normalized = []
     for block in blocks:
         if not isinstance(block, dict):
             continue
+
         block_type = block.get("type")
-        if not block_type:
-            continue
-        # Already in proper Notion format
-        if block_type in block and isinstance(block[block_type], dict):
-            normalized.append(block)
-            continue
-        # Simplified format — convert it
-        text_content = block.get("text") or block.get("content") or ""
-        if isinstance(text_content, list):
-            # already rich_text-like list
-            rich_text = text_content
+
+        if block_type:
+            # Format 1: already proper Notion format
+            if block_type in block and isinstance(block[block_type], dict):
+                if block_type in KNOWN_BLOCK_TYPES:
+                    normalized.append(block)
+                continue
+
+            # Format 2: type + text/content/heading_X value
+            text_value = (
+                block.get("text")
+                or block.get("content")
+                or block.get(block_type)  # e.g. {"type": "heading_2", "heading_2": "Overview"}
+                or ""
+            )
+            result = _make_block(block_type, text_value)
+            if result:
+                normalized.append(result)
         else:
-            rich_text = [{"type": "text", "text": {"content": str(text_content)}}] if text_content else []
-        inner = {"rich_text": rich_text}
-        if block_type == "code":
-            inner["language"] = block.get("language", "plain text")
-        normalized.append({
-            "object": "block",
-            "type": block_type,
-            block_type: inner
-        })
+            # Format 3: multi-key object without type
+            # e.g. {"heading_2": "Overview", "paragraph": "some text"}
+            for key, value in block.items():
+                result = _make_block(key, value)
+                if result:
+                    normalized.append(result)
+
     return normalized
 
 
