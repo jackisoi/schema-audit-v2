@@ -173,10 +173,13 @@ KNOWN_BLOCK_TYPES = {
 def _normalize_blocks(blocks):
     """
     Convert any OpenAI block format to proper Notion API format.
-    Handles 3 formats:
-      1. Proper: {"type": "X", "X": {"rich_text": [...]}}
-      2. Type+text: {"type": "X", "text": "..."} or {"content": "..."}
-      3. Multi-key (no type): {"heading_2": "Overview", "paragraph": "..."}
+    Handles all known formats:
+      1. Proper:     {"type": "X", "X": {"rich_text": [...]}}
+      2. Type+text:  {"type": "X", "text": "..."}
+      3. Multi-key:  {"heading_2": "Overview", "paragraph": "..."}
+      4. Object key: {"object": "heading_2", "text": "..."}
+      5. Nested obj: {"object": {"type": "heading_2", "text": "..."}}
+      6. Nested mk:  {"object": {"heading_2": "Overview", ...}}
     """
     def _make_block(block_type, text_value):
         if block_type not in KNOWN_BLOCK_TYPES:
@@ -192,10 +195,20 @@ def _normalize_blocks(blocks):
             inner["language"] = "plain text"
         return {"object": "block", "type": block_type, block_type: inner}
 
-    normalized = []
-    for block in blocks:
+    def _process_one(block):
         if not isinstance(block, dict):
-            continue
+            return []
+
+        # Unwrap {"object": {...}} nesting
+        obj_val = block.get("object")
+        if isinstance(obj_val, dict):
+            return _process_one(obj_val)
+
+        # Format 4: {"object": "heading_2", "text": "..."}
+        if isinstance(obj_val, str) and obj_val in KNOWN_BLOCK_TYPES:
+            text_value = block.get("text") or block.get("content") or ""
+            result = _make_block(obj_val, text_value)
+            return [result] if result else []
 
         block_type = block.get("type")
 
@@ -203,27 +216,32 @@ def _normalize_blocks(blocks):
             # Format 1: already proper Notion format
             if block_type in block and isinstance(block[block_type], dict):
                 if block_type in KNOWN_BLOCK_TYPES:
-                    normalized.append(block)
-                continue
+                    return [block]
+                return []
 
-            # Format 2: type + text/content/heading_X value
+            # Format 2: type + text/content/block_type-value
             text_value = (
                 block.get("text")
                 or block.get("content")
-                or block.get(block_type)  # e.g. {"type": "heading_2", "heading_2": "Overview"}
+                or (block.get(block_type) if isinstance(block.get(block_type), str) else None)
                 or ""
             )
             result = _make_block(block_type, text_value)
-            if result:
-                normalized.append(result)
-        else:
-            # Format 3: multi-key object without type
-            # e.g. {"heading_2": "Overview", "paragraph": "some text"}
-            for key, value in block.items():
-                result = _make_block(key, value)
-                if result:
-                    normalized.append(result)
+            return [result] if result else []
 
+        # Format 3 & 6: multi-key without type
+        results = []
+        for key, value in block.items():
+            if key in ("object", "type"):
+                continue
+            result = _make_block(key, value)
+            if result:
+                results.append(result)
+        return results
+
+    normalized = []
+    for block in blocks:
+        normalized.extend(_process_one(block))
     return normalized
 
 
