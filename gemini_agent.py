@@ -12,7 +12,7 @@ with open("prompt.txt", "r", encoding="utf-8") as f:
     PROMPT_TEMPLATE = f.read()
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-MODEL_NAME = "gemini-2.0-flash"
+MODEL_NAME = "gemini-2.0-flash-001"
 
 
 SYSTEM_PROMPT = (
