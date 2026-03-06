@@ -175,21 +175,27 @@ def _normalize_blocks(blocks):
     Convert any OpenAI block format to proper Notion API format.
     Handles all known formats:
       1. Proper:     {"type": "X", "X": {"rich_text": [...]}}
-      2. Type+text:  {"type": "X", "text": "..."}
+      2. Type+text:  {"type": "X", "text": "..." or {"content": "..."}}
       3. Multi-key:  {"heading_2": "Overview", "paragraph": "..."}
       4. Object key: {"object": "heading_2", "text": "..."}
       5. Nested obj: {"object": {"type": "heading_2", "text": "..."}}
       6. Nested mk:  {"object": {"heading_2": "Overview", ...}}
     """
+    def _extract_text(val):
+        if isinstance(val, str):
+            return val
+        if isinstance(val, dict):
+            return val.get("content") or val.get("text") or val.get("value") or ""
+        return ""
+
     def _make_block(block_type, text_value):
         if block_type not in KNOWN_BLOCK_TYPES:
             return None
-        if isinstance(text_value, str):
-            rich_text = [{"type": "text", "text": {"content": text_value}}] if text_value else []
-        elif isinstance(text_value, list):
+        if isinstance(text_value, list):
             rich_text = text_value
         else:
-            rich_text = []
+            text_str = _extract_text(text_value)
+            rich_text = [{"type": "text", "text": {"content": text_str}}] if text_str else []
         inner = {"rich_text": rich_text}
         if block_type == "code":
             inner["language"] = "plain text"
@@ -213,26 +219,21 @@ def _normalize_blocks(blocks):
         block_type = block.get("type")
 
         if block_type:
-            # Format 1: already proper Notion format
+            # Format 1: already proper Notion format (with rich_text)
             if block_type in block and isinstance(block[block_type], dict):
                 if block_type in KNOWN_BLOCK_TYPES:
                     inner = block[block_type]
                     if "rich_text" in inner:
-                        return [block]  # פורמט תקין לחלוטין
-                    # inner קיים אבל חסר rich_text
+                        return [block]
+                    # inner dict exists but no rich_text
                     text_value = inner.get("text") or inner.get("content") or ""
                     result = _make_block(block_type, text_value)
                     return [result] if result else []
                 return []
 
-            # Format 2: type + text/content/block_type-value
-            text_value = (
-                block.get("text")
-                or block.get("content")
-                or (block.get(block_type) if isinstance(block.get(block_type), str) else None)
-                or ""
-            )
-            result = _make_block(block_type, text_value)
+            # Format 2: type + text/content (string or dict)
+            raw = block.get("text") or block.get("content") or block.get(block_type) or ""
+            result = _make_block(block_type, raw)
             return [result] if result else []
 
         # Format 3 & 6: multi-key without type
