@@ -70,12 +70,20 @@ def _sanitize_blocks(blocks):
         if isinstance(b, dict) and b.get("type") and b.get(b["type"]) is not None
     ]
 
-    # 2. Sanitize code block rich_text — strip extra keys from text object
+    # 2. Sanitize code block rich_text — remove invalid items, strip extra keys
     for b in blocks:
         if isinstance(b, dict) and b.get("type") == "code":
-            for rt in b.get("code", {}).get("rich_text", []):
-                if isinstance(rt, dict) and isinstance(rt.get("text"), dict):
+            code_inner = b.get("code", {})
+            valid_rt = []
+            for rt in code_inner.get("rich_text", []):
+                if not isinstance(rt, dict):
+                    continue
+                if rt.get("object") == "block":
+                    continue  # Gemini mistakenly placed a block object here
+                if isinstance(rt.get("text"), dict):
                     rt["text"] = {k: v for k, v in rt["text"].items() if k in ("content", "link")}
+                valid_rt.append(rt)
+            code_inner["rich_text"] = valid_rt
 
     # 3. Sanitize rich_text in all block types — fix missing/extra keys in text objects
     for b in blocks:
