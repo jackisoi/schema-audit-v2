@@ -26,11 +26,8 @@ def code(text, language="json"):
 
 
 def get_or_create_project_page(project_name):
-    """Find existing project page or create a new one under PARENT_PAGE_ID.
-    Page title includes the current date: 'Project Name — YYYY-MM-DD HH:MM'
-    """
     from datetime import datetime
-    date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    date_str   = datetime.now().strftime("%Y-%m-%d %H:%M")
     full_title = f"{project_name} — {date_str}"
     results = notion.search(
         query=full_title,
@@ -42,7 +39,6 @@ def get_or_create_project_page(project_name):
             parent = page.get("parent", {})
             if parent.get("page_id") == PARENT_PAGE_ID:
                 return page["id"]
-    # Not found — create it
     response = notion.pages.create(
         parent={"page_id": PARENT_PAGE_ID},
         properties={"title": [{"text": {"content": full_title}}]}
@@ -50,7 +46,6 @@ def get_or_create_project_page(project_name):
     return response["id"]
 
 
-# Keys allowed inside each block type's inner content dict
 _VALID_INNER_KEYS = {
     "paragraph":            {"rich_text", "color"},
     "heading_1":            {"rich_text", "color", "is_toggleable"},
@@ -68,41 +63,30 @@ _VALID_INNER_KEYS = {
 
 
 def _split_code_content(content, language):
-    """Split a long code string into Notion code blocks, cutting only at newline boundaries."""
     blocks = []
-    lines = content.splitlines(keepends=True)
-    chunk = ""
+    lines  = content.splitlines(keepends=True)
+    chunk  = ""
     for line in lines:
         if len(chunk) + len(line) > 1900:
             if chunk:
                 blocks.append({
-                    "object": "block",
-                    "type": "code",
-                    "code": {
-                        "language": language,
-                        "rich_text": [{"type": "text", "text": {"content": chunk}}]
-                    }
+                    "object": "block", "type": "code",
+                    "code": {"language": language,
+                             "rich_text": [{"type": "text", "text": {"content": chunk}}]}
                 })
             chunk = line
         else:
             chunk += line
     if chunk:
         blocks.append({
-            "object": "block",
-            "type": "code",
-            "code": {
-                "language": language,
-                "rich_text": [{"type": "text", "text": {"content": chunk}}]
-            }
+            "object": "block", "type": "code",
+            "code": {"language": language,
+                     "rich_text": [{"type": "text", "text": {"content": chunk}}]}
         })
     return blocks
 
 
 def sanitize_blocks(blocks):
-    """Remove invalid fields from Claude-generated Notion blocks.
-    - Strips unknown keys from inner block content dicts
-    - Auto-splits code blocks exceeding 1900 chars at newline boundaries
-    """
     clean = []
     for block in blocks:
         if not isinstance(block, dict):
@@ -113,18 +97,13 @@ def sanitize_blocks(blocks):
         inner = block.get(block_type, {})
         if not isinstance(inner, dict):
             continue
-
-        # Strip invalid keys from inner content
         valid_keys = _VALID_INNER_KEYS.get(block_type, {"rich_text"})
         inner = {k: v for k, v in inner.items() if k in valid_keys}
-
-        # Auto-split code blocks that exceed 1900 chars
         if block_type == "code":
             rich_text = inner.get("rich_text", [])
-            content = "".join(
+            content   = "".join(
                 rt.get("text", {}).get("content", "")
-                for rt in rich_text
-                if isinstance(rt, dict)
+                for rt in rich_text if isinstance(rt, dict)
             )
             language = inner.get("language", "plain text")
             if len(content) > 1900:
@@ -132,17 +111,13 @@ def sanitize_blocks(blocks):
             else:
                 clean.append({"object": "block", "type": block_type, block_type: inner})
             continue
-
-        # Clean rich_text annotations
         rich_text = inner.get("rich_text", [])
-        clean_rt = []
+        clean_rt  = []
         for rt in rich_text:
             if isinstance(rt, dict):
                 text_obj = rt.get("text", {})
-                # Move misplaced annotations from text{} up to rt level
                 if "annotations" in text_obj:
                     rt["annotations"] = text_obj.pop("annotations")
-                # Strip invalid keys from text{} — only 'content' and 'link' are allowed
                 rt["text"] = {k: v for k, v in text_obj.items() if k in {"content", "link"}}
                 clean_rt.append(rt)
         if rich_text:
@@ -151,17 +126,26 @@ def sanitize_blocks(blocks):
     return clean
 
 
-def write_report_to_notion(project_page_id, url, blocks, used_retry=False):
-    """Create a schema report sub-page under the project page."""
-    title = f"Schema Report — {url}"
+# ─── Phase 2: write_report_to_notion ─────────────────────────────────────────
+
+def write_report_to_notion(project_page_id, url, analysis, page_type,
+                           parent_schemas=None, used_retry=False):
+    context = {
+        "page_url":       url,
+        "page_type":      page_type,
+        "parent_schemas": parent_schemas or {},
+    }
+    blocks = build_report_blocks(analysis, context)
+    title  = f"Schema Report — {url}"
     all_blocks = []
     if used_retry:
         all_blocks.append({
-            "object": "block",
-            "type": "callout",
+            "object": "block", "type": "callout",
             "callout": {
-                "rich_text": [{"type": "text", "text": {"content": "⚠️ דף זה נותח עם נתונים חלקיים (retry mode) — ייתכן שחלק מתוכן הדף לא נלקח בחשבון. מומלץ לבדוק ידנית."}}],
-                "icon": {"emoji": "⚠️"},
+                "rich_text": [{"type": "text", "text": {
+                    "content": "⚠️ דף זה נותח עם נתונים חלקיים (retry mode) — ייתכן שחלק מתוכן הדף לא נלקח בחשבון. מומלץ לבדוק ידנית."
+                }}],
+                "icon":  {"emoji": "⚠️"},
                 "color": "orange_background"
             }
         })
@@ -175,8 +159,7 @@ def write_report_to_notion(project_page_id, url, blocks, used_retry=False):
 
 
 def write_qa_report(project_page_id, project, blocks):
-    """Create the QA report page under the project page."""
-    title = f"דוח QA — {project}"
+    title    = f"דוח QA — {project}"
     response = notion.pages.create(
         parent={"page_id": project_page_id},
         properties={"title": [{"text": {"content": title}}]},
@@ -186,8 +169,7 @@ def write_qa_report(project_page_id, project, blocks):
 
 
 def write_executive_summary(project_page_id, project, blocks):
-    """Create the executive summary page under the project page."""
-    title = f"סיכום מנהלים — {project}"
+    title    = f"סיכום מנהלים — {project}"
     response = notion.pages.create(
         parent={"page_id": project_page_id},
         properties={"title": [{"text": {"content": title}}]},
@@ -197,11 +179,10 @@ def write_executive_summary(project_page_id, project, blocks):
 
 
 def build_scan_blocks(scan_result):
-    blocks = []
-    ca = scan_result["content_analysis"]
-    sd = scan_result["structured_data"]
-    pt = scan_result.get("page_text", {})
-
+    blocks  = []
+    ca      = scan_result["content_analysis"]
+    sd      = scan_result["structured_data"]
+    pt      = scan_result.get("page_text", {})
     blocks.append(h2("Content Analysis"))
     blocks.append(para(f"H1: {ca.get('h1') or 'NOT FOUND'}"))
     h2s = ca.get("h2s", [])
@@ -209,40 +190,155 @@ def build_scan_blocks(scan_result):
     img = ca.get("images", {})
     blocks.append(para(f"Images: {img.get('total', 0)} total, {img.get('missing_alt', 0)} missing alt"))
     blocks.append(para(f"Video: {'Yes' if ca.get('video') else 'No'}"))
-    blocks.append(para(f"Forms: {ca.get('forms') or 'None'}"))
-    blocks.append(para(f"FAQ patterns: {'Yes (' + str(ca.get('question_count', 0)) + ' questions)' if ca.get('faq_patterns') else 'No'}"))
+    q_str = f"Yes ({ca.get('question_count', 0)} questions)" if ca.get('faq_patterns') else "No"
+    blocks.append(para(f"FAQ patterns: {q_str}"))
     contact = ca.get("contact_info", {})
     blocks.append(para(f"Phone: {contact.get('phone') or 'Not found'}"))
     blocks.append(para(f"Email: {contact.get('email') or 'Not found'}"))
     blocks.append(para(f"Address detected: {'Yes' if contact.get('address_detected') else 'No'}"))
-
     blocks.append(h2("Page Text"))
     paragraphs = pt.get("paragraphs", [])
-    if paragraphs:
-        for p in paragraphs:
-            blocks.append(para(p))
-    else:
-        blocks.append(para("No text extracted."))
-
+    for p in (paragraphs or ["No text extracted."]):
+        blocks.append(para(p))
     blocks.append(h2("Structured Data"))
     json_ld = sd.get("json-ld", [])
     if json_ld:
         for i, item in enumerate(json_ld):
             blocks.append(para(f"JSON-LD block {i + 1}:"))
-            content = json.dumps(item, indent=2, ensure_ascii=False)
-            blocks.extend(_split_code_content(content, "json"))
+            blocks.extend(_split_code_content(json.dumps(item, indent=2, ensure_ascii=False), "json"))
     else:
         blocks.append(para("No JSON-LD found."))
     return blocks
 
 
 def write_scan_to_notion(parent_id, scan_result):
-    url = scan_result["url"]
-    title = f"Scan — {url}"
-    blocks = build_scan_blocks(scan_result)
+    url      = scan_result["url"]
+    title    = f"Scan — {url}"
+    blocks   = build_scan_blocks(scan_result)
     response = notion.pages.create(
         parent={"page_id": parent_id},
         properties={"title": [{"text": {"content": title}}]},
         children=blocks[:100]
     )
     return response["url"]
+
+
+# ─── Phase 2: Report Builder ──────────────────────────────────────────────────
+
+from schema_templates import get_template, get_channels
+
+SEVERITY_EMOJI = {"error": "🔴", "warning": "🟡", "info": "🔵"}
+
+
+def build_report_blocks(analysis: dict, context: dict) -> list:
+    blocks  = []
+    blocks += _build_overview(analysis)
+    blocks += _build_issues_section(analysis)
+    blocks += _build_schemas_section(analysis, context)
+    blocks += _build_action_items(analysis)
+    blocks += _build_observations(analysis)
+    blocks += _build_content_recommendations(analysis)
+    return blocks
+
+
+def _build_overview(analysis: dict) -> list:
+    existing    = analysis.get("existing_schemas", [])
+    recommended = analysis.get("recommended_schemas", [])
+    all_issues  = [i for s in existing for i in s.get("issues", [])]
+    errors      = [i for i in all_issues if i["severity"] == "error"]
+    warnings    = [i for i in all_issues if i["severity"] == "warning"]
+    summary = (
+        f"{len(existing)} existing schema(s) analysed  ·  "
+        f"{len(errors)} error(s)  ·  {len(warnings)} warning(s)  ·  "
+        f"{len(recommended)} schema(s) to implement"
+    )
+    return [h2("📋 Overview"), para(summary)]
+
+
+def _build_issues_section(analysis: dict) -> list:
+    existing   = analysis.get("existing_schemas", [])
+    all_issues = []
+    for schema in existing:
+        for issue in schema.get("issues", []):
+            all_issues.append((schema["type"], issue))
+    if not all_issues:
+        return [h2("✅ Issues Found"), para("No issues detected.")]
+    _order = {"error": 0, "warning": 1, "info": 2}
+    all_issues.sort(key=lambda x: _order.get(x[1]["severity"], 3))
+    blocks = [h2("⚠️ Issues Found")]
+    for schema_type, issue in all_issues:
+        emoji = SEVERITY_EMOJI.get(issue["severity"], "•")
+        field = issue.get("field", "")
+        label = f"{schema_type}.{field}" if field else schema_type
+        blocks.append(para(f"{emoji}  {label} — {issue['message']}"))
+    return blocks
+
+
+def _build_schemas_section(analysis: dict, context: dict) -> list:
+    recommended = analysis.get("recommended_schemas", [])
+    if not recommended:
+        return []
+    blocks = [h2("🔧 Schemas to Implement")]
+    for schema in recommended:
+        schema_type = schema["type"]
+        channels    = get_channels(schema_type)
+        header      = f"{schema_type}   {channels}".strip()
+        blocks.append({
+            "object": "block", "type": "heading_3",
+            "heading_3": {"rich_text": [{"type": "text", "text": {"content": header}}]}
+        })
+        json_ld = get_template(schema_type, schema.get("fields", {}), context)
+        blocks.extend(_split_code_content(json_ld, "json"))
+    return blocks
+
+
+def _build_action_items(analysis: dict) -> list:
+    items    = []
+    existing = analysis.get("existing_schemas", [])
+    for schema in existing:
+        for issue in schema.get("issues", []):
+            if issue["severity"] == "error":
+                field = issue.get("field", "")
+                label = f"{schema['type']}.{field}" if field else schema["type"]
+                items.append(f"Fix {label}: {issue['message']}")
+    for schema in existing:
+        for issue in schema.get("issues", []):
+            if issue["severity"] == "warning":
+                field = issue.get("field", "")
+                label = f"{schema['type']}.{field}" if field else schema["type"]
+                items.append(f"Review {label}: {issue['message']}")
+    for schema in analysis.get("recommended_schemas", []):
+        channels = get_channels(schema["type"])
+        items.append(f"Implement {schema['type']}  {channels}".strip())
+    if not items:
+        return []
+    blocks = [h2("✅ Action Items")]
+    for item in items:
+        blocks.append({
+            "object": "block", "type": "numbered_list_item",
+            "numbered_list_item": {"rich_text": [{"type": "text", "text": {"content": item}}]}
+        })
+    return blocks
+
+
+def _build_observations(analysis: dict) -> list:
+    obs = [o for o in analysis.get("observations", []) if o.get("type") != "content_recommendation"]
+    if not obs:
+        return []
+    blocks = [h2("💡 Observations")]
+    for o in obs:
+        blocks.append({
+            "object": "block", "type": "bulleted_list_item",
+            "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": o["message"]}}]}
+        })
+    return blocks
+
+
+def _build_content_recommendations(analysis: dict) -> list:
+    recs = [o for o in analysis.get("observations", []) if o.get("type") == "content_recommendation"]
+    if not recs:
+        return []
+    blocks = [h2("📝 Content Recommendations")]
+    for i, rec in enumerate(recs, 1):
+        blocks.append(para(f"Step {i}: {rec['message']}"))
+    return blocks
