@@ -103,6 +103,12 @@ def sanitize_blocks(blocks):
                 inner = {"rich_text": [{"type": "text", "text": {"content": text_val}}]}
             elif isinstance(text_val, list):
                 inner = {"rich_text": text_val}
+        if "text" in inner and "rich_text" not in inner:
+            text_val = inner.pop("text")
+            if isinstance(text_val, str):
+                inner["rich_text"] = [{"type": "text", "text": {"content": text_val}}]
+            elif isinstance(text_val, list):
+                inner["rich_text"] = text_val
         valid_keys = _VALID_INNER_KEYS.get(block_type, {"rich_text"})
         inner = {k: v for k, v in inner.items() if k in valid_keys}
         if block_type == "code":

@@ -158,11 +158,12 @@ def _resolve(value, field: dict):
 
 def _remove_nulls(obj):
     if isinstance(obj, dict):
-        return {k: _remove_nulls(v) for k, v in obj.items() if v is not None}
+        return {k: _remove_nulls(v) for k, v in obj.items()
+                if v is not None and v != "null" and v != ""}
     if isinstance(obj, list):
-        return [_remove_nulls(i) for i in obj if i is not None]
+        return [_remove_nulls(i) for i in obj
+                if i is not None and i != "null" and i != ""]
     return obj
-
 # ─── Notion Property Readers ──────────────────────────────────────────────────
 
 def _title(props: dict, key: str) -> str:
