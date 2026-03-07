@@ -198,6 +198,7 @@ Email: {ca.get('contact_info', {}).get('email') or 'Not found'}"""
             .replace("{parent_schemas}",   parent_schemas_str)
         )
 
+    print(f"[analyze_debug] url={url} | level={level} | page_type={page_type} | site_type={site_type}", flush=True)
     raw      = _call_openai_v2(build_prompt(5000))
     analysis = safe_parse(raw)
     if analysis is not None:
