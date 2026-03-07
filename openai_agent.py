@@ -255,12 +255,11 @@ Write a comprehensive executive summary in Hebrew as a JSON array of Notion bloc
 
 Structure:
 1. heading_2: "סיכום מנהלים — {project}"
-2. paragraph: ציון בריאות כולל (Poor / Fair / Good / Excellent) + הסבר קצר המבוסס על מספר השגיאות והאזהרות
-3. heading_2: "ממצאים לפי דף"
-4. bulleted_list_item per page: שם הדף + סכמות תקינות שנמצאו + מספר שגיאות/אזהרות. אין לציין מה חסר בסעיף זה.
-5. heading_2: "סדר עדיפויות מומלץ"
-6. numbered_list_item: משימות לפי סדר חשיבות. סמן פריטים קריטיים עם ⚠️ בתחילת השורה. כל פריט: פעולה + הסבר של שורה אחת בלבד. אין לחזור על מידע שכבר מופיע בסעיפים אחרים.
-7. heading_2: "הערות כלליות" — הכלל רק אם יש מידע חדש שלא הוזכר בסדר העדיפויות. מקסימום 3 נקודות.
+2. heading_2: "ממצאים לפי דף"
+3. bulleted_list_item per page: שם הדף + סכמות תקינות שנמצאו + מספר שגיאות/אזהרות. אין לציין מה חסר בסעיף זה.
+4. heading_2: "סדר עדיפויות מומלץ"
+5. numbered_list_item: משימות לפי סדר חשיבות. סמן פריטים קריטיים עם ⚠️ בתחילת השורה. כל פריט: פעולה + הסבר של שורה אחת בלבד. אין לחזור על מידע שכבר מופיע בסעיפים אחרים.
+6. heading_2: "הערות כלליות" — הכלל רק אם יש מידע חדש שלא הוזכר בסדר העדיפויות. מקסימום 3 נקודות.
 
 Rules:
 - All text in Hebrew
@@ -269,8 +268,10 @@ Rules:
 - Do NOT mention accessibility, alt text, WCAG, or screen readers
 - Do NOT include Minor Observations — only Critical Issues
 - Do not invent data not present in the summary above
-- Formatting lists: if a section contains only one item, write it as a plain paragraph. If two or more items, use numbered_list_item blocks."""
-
+- Formatting lists: if a section contains only one item, write it as a plain paragraph. If two or more items, use numbered_list_item blocks.
+- CRITICAL — every block MUST use this exact structure:
+  {{"object": "block", "type": "heading_2", "heading_2": {{"rich_text": [{{"type": "text", "text": "content": "text here"}}]}}}}
+  NEVER use "type": "heading_2", "text": "..." — that format is invalid."""
     raw    = _call_openai(prompt)
     result = safe_parse(raw)
     if result is not None:
@@ -350,7 +351,10 @@ Structure — include ONLY these sections:
 ABSOLUTE RULES:
 - DO NOT write positive confirmations
 - DO NOT include implementation advice or testing instructions
-- Return raw JSON array of Notion blocks only, all text in English"""
+- Return raw JSON array of Notion blocks only, all text in English
+- CRITICAL — every block MUST use this exact structure:
+  {{"object": "block", "type": "heading_2", "heading_2": {{"rich_text": [{{"type": "text", "text": "content": "text here"}}]}}}}
+  NEVER use "type": "heading_2", "text": "..." — that format is invalid."""
 
     raw    = _call_openai(prompt)
     result = safe_parse(raw)
