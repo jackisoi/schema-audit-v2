@@ -53,7 +53,11 @@ def webhook():
             data = dict(request.form)
 
         project   = data.get("q5_project")  or data.get("Project",   "Unknown Project")
-        site_type = ", ".join(request.form.getlist("q11_typeA11[]")) or "Unknown"
+        site_type_raw = data.get("q11_typeA11", [])
+        if isinstance(site_type_raw, list):
+            site_type = ", ".join(site_type_raw) or "Unknown"
+        else:
+            site_type = site_type_raw or "Unknown"
         urls_raw  = data.get("q6_typeA")    or data.get("URLs for analysis", "[]")
         if isinstance(urls_raw, str):
             try:
