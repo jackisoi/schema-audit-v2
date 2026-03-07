@@ -143,9 +143,9 @@ def write_report_to_notion(project_page_id, url, analysis, page_type,
             "object": "block", "type": "callout",
             "callout": {
                 "rich_text": [{"type": "text", "text": {
-                    "content": "⚠️ דף זה נותח עם נתונים חלקיים (retry mode) — ייתכן שחלק מתוכן הדף לא נלקח בחשבון. מומלץ לבדוק ידנית."
+                    "content": "\u26a0\ufe0f \u05d3\u05e3 \u05d6\u05d4 \u05e0\u05d5\u05ea\u05d7 \u05e2\u05dd \u05e0\u05ea\u05d5\u05e0\u05d9\u05dd \u05d7\u05dc\u05e7\u05d9\u05d9\u05dd (retry mode) \u2014 \u05d9\u05d9\u05ea\u05db\u05df \u05e9\u05d7\u05dc\u05e7 \u05de\u05ea\u05d5\u05db\u05df \u05d4\u05d3\u05e3 \u05dc\u05d0 \u05e0\u05dc\u05e7\u05d7 \u05d1\u05d7\u05e9\u05d1\u05d5\u05df. \u05de\u05d5\u05de\u05dc\u05e5 \u05dc\u05d1\u05d3\u05d5\u05e7 \u05d9\u05d3\u05e0\u05d9\u05ea."
                 }}],
-                "icon":  {"emoji": "⚠️"},
+                "icon":  {"emoji": "\u26a0\ufe0f"},
                 "color": "orange_background"
             }
         })
@@ -159,7 +159,7 @@ def write_report_to_notion(project_page_id, url, analysis, page_type,
 
 
 def write_qa_report(project_page_id, project, blocks):
-    title    = f"דוח QA — {project}"
+    title    = f"\u05d3\u05d5\u05d7 QA \u2014 {project}"
     response = notion.pages.create(
         parent={"page_id": project_page_id},
         properties={"title": [{"text": {"content": title}}]},
@@ -169,7 +169,7 @@ def write_qa_report(project_page_id, project, blocks):
 
 
 def write_executive_summary(project_page_id, project, blocks):
-    title    = f"סיכום מנהלים — {project}"
+    title    = f"\u05e1\u05d9\u05db\u05d5\u05dd \u05de\u05e0\u05d4\u05dc\u05d9\u05dd \u2014 {project}"
     response = notion.pages.create(
         parent={"page_id": project_page_id},
         properties={"title": [{"text": {"content": title}}]},
@@ -242,13 +242,13 @@ def build_report_blocks(analysis: dict, context: dict) -> list:
 
 
 def _build_overview(analysis: dict) -> list:
-    existing    = analysis.get("existing_schemas", [])
+    existing    = analysis.get("existing_schemas", {})
     recommended = analysis.get("recommended_schemas", [])
-    all_issues  = [i for s in existing for i in s.get("issues", [])]
-    errors      = [i for i in all_issues if i["severity"] == "error"]
-    warnings    = [i for i in all_issues if i["severity"] == "warning"]
+    all_issues  = existing.get("issues", [])
+    errors      = [i for i in all_issues if i.get("severity") == "error"]
+    warnings    = [i for i in all_issues if i.get("severity") == "warning"]
     summary = (
-        f"{len(existing)} existing schema(s) analysed  ·  "
+        f"{len(existing.get('valid', []))} valid schema(s)  ·  "
         f"{len(errors)} error(s)  ·  {len(warnings)} warning(s)  ·  "
         f"{len(recommended)} schema(s) to implement"
     )
@@ -256,21 +256,20 @@ def _build_overview(analysis: dict) -> list:
 
 
 def _build_issues_section(analysis: dict) -> list:
-    existing   = analysis.get("existing_schemas", [])
-    all_issues = []
-    for schema in existing:
-        for issue in schema.get("issues", []):
-            all_issues.append((schema["type"], issue))
+    existing   = analysis.get("existing_schemas", {})
+    all_issues = existing.get("issues", [])
+
     if not all_issues:
         return [h2("✅ Issues Found"), para("No issues detected.")]
-    _order = {"error": 0, "warning": 1, "info": 2}
-    all_issues.sort(key=lambda x: _order.get(x[1]["severity"], 3))
+
+    _order     = {"error": 0, "warning": 1, "info": 2}
+    all_issues = sorted(all_issues, key=lambda x: _order.get(x.get("severity"), 3))
+
     blocks = [h2("⚠️ Issues Found")]
-    for schema_type, issue in all_issues:
-        emoji = SEVERITY_EMOJI.get(issue["severity"], "•")
-        field = issue.get("field", "")
-        label = f"{schema_type}.{field}" if field else schema_type
-        blocks.append(para(f"{emoji}  {label} — {issue['message']}"))
+    for issue in all_issues:
+        emoji  = SEVERITY_EMOJI.get(issue.get("severity"), "•")
+        schema = issue.get("schema", "")
+        blocks.append(para(f"{emoji}  {schema} — {issue.get('problem', '')}"))
     return blocks
 
 
@@ -293,20 +292,15 @@ def _build_schemas_section(analysis: dict, context: dict) -> list:
 
 
 def _build_action_items(analysis: dict) -> list:
-    items    = []
-    existing = analysis.get("existing_schemas", [])
-    for schema in existing:
-        for issue in schema.get("issues", []):
-            if issue["severity"] == "error":
-                field = issue.get("field", "")
-                label = f"{schema['type']}.{field}" if field else schema["type"]
-                items.append(f"Fix {label}: {issue['message']}")
-    for schema in existing:
-        for issue in schema.get("issues", []):
-            if issue["severity"] == "warning":
-                field = issue.get("field", "")
-                label = f"{schema['type']}.{field}" if field else schema["type"]
-                items.append(f"Review {label}: {issue['message']}")
+    items      = []
+    existing   = analysis.get("existing_schemas", {})
+    all_issues = existing.get("issues", [])
+    for issue in all_issues:
+        if issue.get("severity") == "error":
+            items.append(f"Fix {issue.get('schema', '')}: {issue.get('problem', '')}")
+    for issue in all_issues:
+        if issue.get("severity") == "warning":
+            items.append(f"Review {issue.get('schema', '')}: {issue.get('problem', '')}")
     for schema in analysis.get("recommended_schemas", []):
         channels = get_channels(schema["type"])
         items.append(f"Implement {schema['type']}  {channels}".strip())
@@ -329,7 +323,7 @@ def _build_observations(analysis: dict) -> list:
     for o in obs:
         blocks.append({
             "object": "block", "type": "bulleted_list_item",
-            "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": o["message"]}}]}
+            "bulleted_list_item": {"rich_text": [{"type": "text", "text": {"content": o.get("text", "")}}]}
         })
     return blocks
 
@@ -340,5 +334,5 @@ def _build_content_recommendations(analysis: dict) -> list:
         return []
     blocks = [h2("📝 Content Recommendations")]
     for i, rec in enumerate(recs, 1):
-        blocks.append(para(f"Step {i}: {rec['message']}"))
+        blocks.append(para(f"Step {i}: {rec.get('text', '')}"))
     return blocks
