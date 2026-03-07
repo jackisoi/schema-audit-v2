@@ -181,7 +181,8 @@ def write_qa_report(project_page_id, project, blocks):
 
 
 def write_executive_summary(project_page_id, project, blocks):
-    title    = f"\u05e1\u05d9\u05db\u05d5\u05dd \u05de\u05e0\u05d4\u05dc\u05d9\u05dd \u2014 {project}"
+    print(f"[exec_debug] block[0]: {blocks[0] if blocks else 'EMPTY'}", flush=True)
+    title    = f"סיכום מנהלים — {project}"
     response = notion.pages.create(
         parent={"page_id": project_page_id},
         properties={"title": [{"text": {"content": title}}]},
