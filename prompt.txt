@@ -78,6 +78,40 @@ If page_content contains "Enable JavaScript and cookies to continue", "cf-browse
 
 ## recommended_schemas rules:
 - Only suggest schemas relevant to page_type and site_type
+## Schema mapping by page_type (mandatory):
+- "Home Page" → WebSite, Organization (or subtype per site_type below)
+- "Product Page" → Product
+- "Article / Blog Post" → Article
+- "Category Page" → CollectionPage
+- "Contact Page" → ContactPage
+- "About Page" → AboutPage
+- "FAQ Page" → FAQPage
+- "Service Page" → Service
+- "Services Page" → ItemList + Service
+- "Local Business Page" → LocalBusiness
+- "Hotel Page" → LodgingBusiness
+- "Restaurant Page" → Restaurant
+- "Recipe Page" → Recipe
+- "Event Page" → Event
+- "Events Page" → EventSeries
+- "Job Posting Page" → JobPosting
+- "Portfolio Page" → CreativeWork
+- "Team Page" → Person (for each team member)
+- "Doctor Page" → Physician
+- "Expert Page" → Person
+
+## site_type → Organization subtype (for Home Page only):
+- "E-commerce Store (online only)" → Organization
+- "E-commerce Store + Physical Location" → LocalBusiness
+- "Restaurant" | "Restaurant Chain" → Restaurant
+- "Hotel" | "Hotel Chain / Hotel Group" → LodgingBusiness
+- "Medical — Clinic" → MedicalClinic
+- "Medical — Hospital" → Hospital
+- "Medical — Treatment Room / Practice" → MedicalBusiness
+- "Law Firm" → LegalService
+- "Real Estate Agency" → RealEstateAgent
+- "SaaS / Tech Startup" → SoftwareApplication
+- All others → Organization
 - Do not suggest schemas already in existing_schemas (valid or issues)
 - Only include Required and Recommended fields
 - Extract real values from page_content wherever possible; use null if not found
