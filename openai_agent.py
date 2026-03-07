@@ -188,13 +188,14 @@ Email: {ca.get('contact_info', {}).get('email') or 'Not found'}"""
             + (pt.get("text") or "")[:text_limit]
             + faq_section
         )
-        return prompt_template.format(
-            page_url         = url,
-            page_type        = page_type,
-            site_type        = site_type,
-            page_content     = page_content,
-            existing_schemas = existing_schemas_str[:6000],
-            parent_schemas   = parent_schemas_str,
+        return (
+            prompt_template
+            .replace("{page_url}",         url)
+            .replace("{page_type}",        page_type)
+            .replace("{site_type}",        site_type)
+            .replace("{page_content}",     page_content)
+            .replace("{existing_schemas}", existing_schemas_str[:6000])
+            .replace("{parent_schemas}",   parent_schemas_str)
         )
 
     raw      = _call_openai_v2(build_prompt(5000))
