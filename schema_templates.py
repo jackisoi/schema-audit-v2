@@ -91,7 +91,7 @@ def get_template(schema_type: str, ai_fields: dict, context: dict) -> str:
             if key == "Organization":
                 obj["isPartOf"] = {"@id": parent_id}
 
-    return json.dumps(obj, indent=2, ensure_ascii=False)
+    return json.dumps(_remove_nulls(obj), indent=2, ensure_ascii=False)
 
 
 def get_channels(schema_type: str) -> str:
@@ -156,6 +156,12 @@ def _resolve(value, field: dict):
         return f"// REQUIRED: {description}"
     return None  # Recommended / Optional with no value → omit
 
+def _remove_nulls(obj):
+    if isinstance(obj, dict):
+        return {k: _remove_nulls(v) for k, v in obj.items() if v is not None}
+    if isinstance(obj, list):
+        return [_remove_nulls(i) for i in obj if i is not None]
+    return obj
 
 # ─── Notion Property Readers ──────────────────────────────────────────────────
 
