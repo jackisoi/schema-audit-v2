@@ -519,3 +519,15 @@ def generate_text(prompt):
         messages=[{"role": "user", "content": prompt}]
     )
     return message.content[0].text
+def analyze_page_v2(scan_result, level, page_type, site_type, parent_context=None):
+    result = analyze_with_scan(scan_result, level, page_type, site_type, parent_context=parent_context)
+    analysis = {
+        "blocks":               result["blocks"],
+        "recommended_schemas":  [{"type": t} for t in result["recommended_schemas"]],
+        "recommended_ids":      result["recommended_ids"],
+        "existing_schemas":     {"valid": [], "issues": []},
+    }
+    return {
+        "analysis":   analysis,
+        "used_retry": result["used_retry"],
+    }
