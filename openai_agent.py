@@ -31,7 +31,27 @@ SCRAPER_LABELS = {
     "scrapingbee_premium":  "ScrapingBee premium (75 credits)",
     "playwright":           "Playwright (0 credits)",
 }
-
+PAGE_TYPE_SCHEMA_MAP = {
+    "Home Page":           ["WebSite", "Organization"],
+    "Product Page":        ["Product"],
+    "Contact Page":        ["ContactPage"],
+    "About Page":          ["AboutPage"],
+    "Article / Blog Post": ["Article"],
+    "Category Page":       ["CollectionPage"],
+    "FAQ Page":            ["FAQPage"],
+    "Service Page":        ["Service"],
+    "Services Page":       ["ItemList", "Service"],
+    "Hotel Page":          ["LodgingBusiness"],
+    "Restaurant Page":     ["Restaurant"],
+    "Recipe Page":         ["Recipe"],
+    "Event Page":          ["Event"],
+    "Job Posting Page":    ["JobPosting"],
+    "Local Business Page": ["LocalBusiness"],
+    "Doctor Page":         ["Physician"],
+    "Expert Page":         ["Person"],
+    "Team Page":           ["Person"],
+    "Portfolio Page":      ["CreativeWork"],
+}
 
 # ─── Internal callers ────────────────────────────────────────────────────────
 
@@ -181,6 +201,12 @@ FAQ patterns: {'Yes' if ca.get('faq_patterns') else 'No'}
 Phone: {ca.get('contact_info', {}).get('phone') or 'Not found'}
 Email: {ca.get('contact_info', {}).get('email') or 'Not found'}"""
 
+    required = PAGE_TYPE_SCHEMA_MAP.get(page_type, [])
+    required_hint = (
+        f"REQUIRED: recommended_schemas MUST include these exact types "
+        f"(skip only if already in existing_schemas.valid): {required}\n\n"
+    ) if required else ""
+
     def build_prompt(text_limit):
         page_content = (
             content_summary
@@ -189,7 +215,8 @@ Email: {ca.get('contact_info', {}).get('email') or 'Not found'}"""
             + faq_section
         )
         return (
-            prompt_template
+            required_hint
+            + prompt_template
             .replace("{page_url}",         url)
             .replace("{page_type}",        page_type)
             .replace("{site_type}",        site_type)
