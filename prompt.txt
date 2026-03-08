@@ -80,8 +80,8 @@ If page_content contains "Enable JavaScript and cookies to continue", "cf-browse
   ALWAYS recommend WebSite and Organization (subtype per site_type mapping above)
   Do NOT recommend any other schema type based on guesses
 ## recommended_schemas rules:
-- Only suggest schemas relevant to page_type and site_type
-## Schema mapping by page_type (mandatory):
+- The schema type in recommended_schemas MUST match exactly the mapping below — no exceptions, no substitutions, no additions
+## Schema mapping by page_type — CRITICAL: you MUST follow this exactly:
 - "Home Page" → WebSite, Organization (or subtype per site_type below)
 - "Product Page" → Product
 - "Article / Blog Post" → Article
