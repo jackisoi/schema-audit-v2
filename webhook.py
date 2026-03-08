@@ -93,30 +93,6 @@ def webhook():
         urls_sorted    = sorted(urls, key=lambda x: str(x["Level"]))
         parent_context = {}   # level → {url, recommended_schemas}
 
-        import sys
-        from schema_mapper import get_all_fields_for_page
-
-        for item in urls_sorted[2:3]:
-            url       = item["URL"]
-            level     = item["Level"]
-            page_type = item["Page type"]
-            scan = scan_page(url)
-
-            # חלץ סכמות תקינות קיימות
-            json_ld = scan["structured_data"].get("json-ld", [])
-            existing_valid = []
-            for block in json_ld:
-                for entry in block.get("@graph", [block]):
-                    t = entry.get("@type")
-                    if t:
-                        existing_valid.append(t) if isinstance(t, str) else existing_valid.extend(t)
-
-            print(f"[DEBUG STEP 3] existing_valid={existing_valid}")
-            fields = get_all_fields_for_page(page_type, site_type, existing_valid=existing_valid)
-            print(f"[DEBUG STEP 3] fields to extract:")
-            print(json.dumps(fields, ensure_ascii=False, indent=2))
-            sys.exit("STEP 3 OK — בדוק פלט")
-
         for item in urls_sorted:
             url       = item["URL"]
             level     = item["Level"]

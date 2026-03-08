@@ -28,6 +28,7 @@ else:
     # fallback: Anthropic Claude
     from claude_agent import (
         analyze_page_v2,
+        extract_schema_values,   
         generate_executive_summary,
         generate_qa_report,
         generate_text,

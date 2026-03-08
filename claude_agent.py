@@ -531,3 +531,65 @@ def analyze_page_v2(scan_result, level, page_type, site_type, parent_context=Non
         "analysis":   analysis,
         "used_retry": result["used_retry"],
     }
+# ── הוסף לסוף claude_agent.py ──────────────────────────────────────────
+
+def extract_schema_values(page_text, schemas_fields, url=""):
+    """
+    Hybrid extraction: Claude מחלץ רק ערכים ספציפיים מתוכן הדף.
+    
+    schemas_fields: list of dicts:
+      [{"schema_type": "Product", "required": ["name","offers"], "recommended": ["image","description"]}, ...]
+    
+    Returns:
+      dict: {"Product": {"name": "...", "offers": {...}, ...}, ...}
+    """
+    if not schemas_fields:
+        return {}
+
+    # בנה רשימת שדות לכל סכמה
+    schema_lines = []
+    for s in schemas_fields:
+        required_str    = ", ".join(s["required"])    if s["required"]    else "none"
+        recommended_str = ", ".join(s["recommended"]) if s["recommended"] else "none"
+        schema_lines.append(
+            f"- {s['schema_type']}:\n"
+            f"    required: {required_str}\n"
+            f"    recommended: {recommended_str}"
+        )
+    schemas_block = "\n".join(schema_lines)
+
+    prompt = f"""You are a Schema.org structured data expert.
+
+Page URL: {url}
+
+Page content (truncated to 4000 chars):
+{page_text[:4000]}
+
+Extract values for the following Schema.org schemas and their fields.
+Return ONLY a JSON object where each key is a schema type and the value is a dict of field→value pairs.
+For fields you cannot find, omit them (do not guess).
+For "offers" on Product, return a nested Offer object.
+For "address" on LocalBusiness, return a PostalAddress object.
+
+Schemas to fill:
+{schemas_block}
+
+Return only the JSON object, no explanation."""
+
+    try:
+        raw = call_claude_v2(prompt, SYSTEM_PROMPT_V2).strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1]
+            raw = raw.rsplit("```", 1)[0].strip()
+        try:
+            return json.loads(raw)
+        except Exception:
+            try:
+                from json_repair import repair_json
+                return json.loads(repair_json(raw))
+            except Exception:
+                print(f"    [extract_schema_values] JSON parse failed: {raw[:200]}")
+                return {}
+    except Exception as e:
+        print(f"    [extract_schema_values] error: {e}")
+        return {}
