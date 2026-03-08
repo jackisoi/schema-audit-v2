@@ -207,10 +207,11 @@ Email: {ca.get('contact_info', {}).get('email') or 'Not found'}"""
         missing   = ", ".join(schema_context.get("missing_schemas", [])) or "none"
         extracted = json.dumps(schema_context.get("extracted_values", {}), ensure_ascii=False)
         schema_context_section = f"""
-PRE-COMPUTED SCHEMA ANALYSIS:
-Already valid (do not redefine): {valid}
-Missing / needs implementation: {missing}
-Extracted values from page (use these in JSON-LD, do not guess): {extracted}
+ANALYSIS HINTS (input context only — do NOT affect output format):
+- Schemas already valid on this page: {valid}
+- Schemas missing that need implementation: {missing}
+- Extracted field values to use in JSON-LD (do not guess, use only these): {extracted}
+Your output must still be a JSON array of Notion report blocks as specified. Do not return an analysis object.
 """
 
     parent_section = ""
