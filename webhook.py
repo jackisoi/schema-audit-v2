@@ -69,7 +69,10 @@ def webhook():
 
         print(f"[DEBUG RAW FULL] data keys: {list(data.keys())}")
         print(f"[DEBUG RAW FULL] raw request.form keys: {list(request.form.keys())}")
-        print(f"[DEBUG RAW FULL] rawRequest value: {repr(request.form.get('rawRequest', ''))[:500]}")
+        raw_full = request.form.get("rawRequest", "")
+        print(f"[DEBUG RAW FULL] rawRequest length: {len(raw_full)}")
+        print(f"[DEBUG RAW FULL] rawRequest[:3000]: {raw_full[:3000]}")
+        print(f"[DEBUG RAW FULL] data.get('pretty'): {repr(data.get('pretty'))}")
         print(f"Project: {project} | Site type: {site_type} | URLs: {len(urls)}")
 
         project_page_id = get_or_create_project_page(project)
