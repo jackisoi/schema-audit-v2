@@ -115,7 +115,7 @@ If page_content contains "Enable JavaScript and cookies to continue", "cf-browse
 - "Real Estate Agency" → RealEstateAgent
 - "SaaS / Tech Startup" → SoftwareApplication
 - All others → Organization
-- Do not suggest schemas already in existing_schemas (valid or issues)
+- Do not suggest schemas already in existing_schemas.valid
 - Only include Required and Recommended fields
 - Extract real values from page_content wherever possible; use null if not found
 - Never invent or estimate values

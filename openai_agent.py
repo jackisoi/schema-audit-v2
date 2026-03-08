@@ -203,8 +203,10 @@ Email: {ca.get('contact_info', {}).get('email') or 'Not found'}"""
 
     required = PAGE_TYPE_SCHEMA_MAP.get(page_type, [])
     required_hint = (
-        f"REQUIRED: recommended_schemas MUST include these exact types "
-        f"(skip only if already in existing_schemas.valid): {required}\n\n"
+        f"THIS PAGE: page_type={page_type} | url={url}\n"
+        f"REQUIRED for recommended_schemas only — MUST recommend these types "
+        f"(skip only if already in existing_schemas.valid): {required}\n"
+        f"Analyze existing_schemas normally — this rule does NOT affect existing_schemas.\n\n"
     ) if required else ""
 
     def build_prompt(text_limit):
