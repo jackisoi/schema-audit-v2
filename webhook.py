@@ -6,7 +6,7 @@ from flask import Flask, request, jsonify
 from notion_client import Client
 from scraper import scan_page
 from ai_router import (
-    analyze_page_v2,
+    extract_schema_values,
     generate_executive_summary,
     generate_qa_report,
     claude_usage,
@@ -18,13 +18,13 @@ from notion_writer import (
     write_executive_summary,
     write_qa_report,
 )
+from schema_mapper import get_all_fields_for_page
 from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
 notion     = Client(auth=os.getenv("NOTION_API_KEY"))
 NTFY_TOPIC = os.getenv("NTFY_TOPIC", "jacki-schema-audit-2026")
-
 
 def send_ntfy(message):
     try:
@@ -33,18 +33,15 @@ def send_ntfy(message):
     except Exception:
         pass
 
-
 def is_page_blocked(scan):
     pt   = scan.get("page_text", {})
     text = pt.get("text") or ""
     return "Enable JavaScript" in text or "cf-browser-verification" in text
 
-
 @app.route("/webhook", methods=["POST"])
 def webhook():
     if request.args.get("key") != os.getenv("WEBHOOK_SECRET"):
         return jsonify({"status": "unauthorized"}), 401
-
     try:
         raw = request.form.get("rawRequest", "{}")
         try:
@@ -59,13 +56,14 @@ def webhook():
                 print(f"[DEBUG] json_repair failed: {e2}")
                 data = dict(request.form)
 
-        project   = data.get("q5_project")  or data.get("Project",   "Unknown Project")
+        project       = data.get("q5_project")  or data.get("Project",   "Unknown Project")
         site_type_raw = data.get("q11_typeA11", [])
         if isinstance(site_type_raw, list):
             site_type = ", ".join(site_type_raw) or "Unknown"
         else:
             site_type = site_type_raw or "Unknown"
-        urls_raw  = data.get("q6_typeA")    or data.get("URLs for analysis", "[]")
+
+        urls_raw = data.get("q6_typeA") or data.get("URLs for analysis", "[]")
         if isinstance(urls_raw, str):
             try:
                 urls = json.loads(urls_raw)
@@ -74,24 +72,17 @@ def webhook():
         else:
             urls = urls_raw
 
-        print(f"[DEBUG RAW FULL] data keys: {list(data.keys())}")
-        print(f"[DEBUG RAW FULL] raw request.form keys: {list(request.form.keys())}")
-        raw_full = request.form.get("rawRequest", "")
-        print(f"[DEBUG RAW FULL] rawRequest length: {len(raw_full)}")
-        print(f"[DEBUG RAW FULL] rawRequest[:3000]: {raw_full[:3000]}")
-        print(f"[DEBUG RAW FULL] data.get('pretty'): {repr(data.get('pretty'))}")
         print(f"Project: {project} | Site type: {site_type} | URLs: {len(urls)}")
 
         project_page_id = get_or_create_project_page(project)
 
-        # Reset usage counter for this run
         claude_usage["input_tokens"]  = 0
         claude_usage["output_tokens"] = 0
 
         results        = []
         page_summaries = []
         urls_sorted    = sorted(urls, key=lambda x: str(x["Level"]))
-        parent_context = {}   # level → {url, recommended_schemas}
+        parent_context = {}
 
         for item in urls_sorted:
             url       = item["URL"]
@@ -115,24 +106,70 @@ def webhook():
                 }])
                 return jsonify({"status": "blocked", "project": project, "url": url})
 
-            print(f"  Analyzing: {url}")
-            result     = analyze_page_v2(scan, level, page_type, site_type,
-                                         parent_context=parent_context)
-            analysis   = result["analysis"]
-            used_retry = result["used_retry"]
+            # חלץ סכמות קיימות
+            json_ld = scan["structured_data"].get("json-ld", [])
+            existing_valid = []
+            for block in json_ld:
+                for entry in block.get("@graph", [block]):
+                    t = entry.get("@type")
+                    if t:
+                        if isinstance(t, str):
+                            existing_valid.append(t)
+                        else:
+                            existing_valid.extend(t)
 
-            # Update parent context for child levels
+            # קבל שדות נדרשים
+            schemas_fields = get_all_fields_for_page(page_type, site_type, existing_valid=existing_valid)
+            print(f"  [hybrid] schemas to extract: {[s['schema_type'] for s in schemas_fields]}")
+
+            used_retry = False
+
+            if not schemas_fields:
+                print(f"  [hybrid] All schemas valid — skipping Claude")
+                analysis = {
+                    "existing_schemas": {
+                        "valid":  list(set(existing_valid)),
+                        "issues": []
+                    },
+                    "recommended_schemas": [],
+                    "observations": [{
+                        "type": "info",
+                        "text": "All recommended schemas already present."
+                    }]
+                }
+            else:
+                pt        = scan.get("page_text", {})
+                page_text = pt.get("text") or ""
+                extracted = extract_schema_values(page_text, schemas_fields, url=url)
+                print(f"  [hybrid] extracted keys: {list(extracted.keys())}")
+
+                recommended_schemas = []
+                for s in schemas_fields:
+                    schema_type = s["schema_type"]
+                    recommended_schemas.append({
+                        "type":   schema_type,
+                        "fields": extracted.get(schema_type, {}),
+                    })
+
+                analysis = {
+                    "existing_schemas": {
+                        "valid":  list(set(existing_valid)),
+                        "issues": []
+                    },
+                    "recommended_schemas": recommended_schemas,
+                    "observations": []
+                }
+
             parent_context[level] = {
                 "url":                url,
                 "recommended_schemas": analysis.get("recommended_schemas", []),
             }
 
-            # Build parent_schemas for @id injection in schema templates
             parent_schemas = {}
             for lvl, ctx in parent_context.items():
                 for r in ctx.get("recommended_schemas", []):
                     t = r["type"] if isinstance(r, dict) else r
-                    if t in ("Organization", "WebSite"):
+                    if t in ("Organization", "WebSite", "LocalBusiness"):
                         parent_schemas[t] = f"{ctx['url']}#{t.lower()}"
 
             notion_url = write_report_to_notion(
@@ -142,7 +179,6 @@ def webhook():
             )
             print(f"  Done: {notion_url}")
             results.append({"url": url, "notion": notion_url})
-
             page_summaries.append({
                 "url":           url,
                 "level":         level,
@@ -212,7 +248,6 @@ def webhook():
         _project = locals().get("project", "Unknown")
         send_ntfy(f"❌ {_project} — ריצה נכשלה: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
-
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
