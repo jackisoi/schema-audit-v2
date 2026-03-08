@@ -531,22 +531,11 @@ def analyze_page_v2(scan_result, level, page_type, site_type, parent_context=Non
         "analysis":   analysis,
         "used_retry": result["used_retry"],
     }
-# ── הוסף לסוף claude_agent.py ──────────────────────────────────────────
-
+# ───────────────────────────────────────────
 def extract_schema_values(page_text, schemas_fields, url=""):
-    """
-    Hybrid extraction: Claude מחלץ רק ערכים ספציפיים מתוכן הדף.
-    
-    schemas_fields: list of dicts:
-      [{"schema_type": "Product", "required": ["name","offers"], "recommended": ["image","description"]}, ...]
-    
-    Returns:
-      dict: {"Product": {"name": "...", "offers": {...}, ...}, ...}
-    """
     if not schemas_fields:
         return {}
 
-    # בנה רשימת שדות לכל סכמה
     schema_lines = []
     for s in schemas_fields:
         required_str    = ", ".join(s["required"])    if s["required"]    else "none"
@@ -577,7 +566,15 @@ Schemas to fill:
 Return only the JSON object, no explanation."""
 
     try:
-        raw = call_claude_v2(prompt, SYSTEM_PROMPT_V2).strip()
+        message = client.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=2000,
+            system=SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        claude_usage["input_tokens"]  += message.usage.input_tokens
+        claude_usage["output_tokens"] += message.usage.output_tokens
+        raw = message.content[0].text.strip()
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1]
             raw = raw.rsplit("```", 1)[0].strip()
