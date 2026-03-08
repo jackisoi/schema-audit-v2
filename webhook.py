@@ -81,21 +81,28 @@ def webhook():
         parent_context = {}   # level → {url, recommended_schemas}
 
         from schema_mapper import get_all_fields_for_page
-        import sys
+        import sys, json
 
         for item in urls_sorted[:1]:  # רק דף הבית
             url       = item["URL"]
             level     = item["Level"]
             page_type = item["Page type"]
             scan = scan_page(url)
-            pt   = scan.get("page_text", {})
-            ca   = scan.get("content_analysis", {})
-            print(f"[DEBUG STEP 2] url={url}")
-            print(f"  scraper_used={scan.get('scraper_used')}")
-            print(f"  raw_len={len(pt.get('text') or '')}")
-            print(f"  h1={ca.get('h1')}")
-            print(f"  json-ld count={len(scan['structured_data'].get('json-ld', []))}")
-            sys.exit("STEP 2 OK — בדוק פלט")
+
+            # חלץ סכמות תקינות קיימות
+            json_ld = scan["structured_data"].get("json-ld", [])
+            existing_valid = []
+            for block in json_ld:
+                for entry in block.get("@graph", [block]):
+                    t = entry.get("@type")
+                    if t:
+                        existing_valid.append(t) if isinstance(t, str) else existing_valid.extend(t)
+
+            print(f"[DEBUG STEP 3] existing_valid={existing_valid}")
+            fields = get_all_fields_for_page(page_type, site_type, existing_valid=existing_valid)
+            print(f"[DEBUG STEP 3] fields to extract:")
+            print(json.dumps(fields, ensure_ascii=False, indent=2))
+            sys.exit("STEP 3 OK — בדוק פלט")
 
         for item in urls_sorted:
             url       = item["URL"]
