@@ -49,8 +49,15 @@ def webhook():
         raw = request.form.get("rawRequest", "{}")
         try:
             data = json.loads(raw)
-        except Exception:
-            data = dict(request.form)
+        except Exception as e:
+            print(f"[DEBUG] json.loads failed: {e}")
+            try:
+                from json_repair import repair_json
+                data = json.loads(repair_json(raw))
+                print(f"[DEBUG] json_repair succeeded")
+            except Exception as e2:
+                print(f"[DEBUG] json_repair failed: {e2}")
+                data = dict(request.form)
 
         project   = data.get("q5_project")  or data.get("Project",   "Unknown Project")
         site_type_raw = data.get("q11_typeA11", [])
