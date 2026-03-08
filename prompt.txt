@@ -62,6 +62,7 @@ If either fails → put in "issues" only, not "valid"
 - LocalBusiness is a subtype of Organization. Never create a separate LocalBusiness @id if an Organization @id already exists in parent_schemas — flag as "error" if detected
 - SearchAction in existing schemas: if no search form is detected in page_content → flag as "error"
 - Never recommend SearchAction unless a search input is confirmed in page_content
+- Never add a content_recommendation observation about adding a search form — SearchAction absence is flagged as an issue only, never as content to create
 - FAQPage Q/A swap detection: flag as "error" ONLY if "name" field contains long explanatory text AND "acceptedAnswer.text" contains a short phrase ending with "?". CRITICAL: if "name" ends with "?" — it IS a question, never flag as swapped
 - FAQPage HTML tags: if acceptedAnswer.text contains HTML tags (<p>, <a>, etc.) → flag as "warning"
 - sameAs: never include sameAs: [] — omit entirely if no URLs are known
@@ -75,7 +76,9 @@ If page_content contains "Enable JavaScript and cookies to continue", "cf-browse
 - Add to observations: { "severity": "warning", "type": "blocked_page", "text": "Page blocked by Cloudflare — schemas could not be verified" }
 - Do NOT flag missing schemas as errors
 - Still populate recommended_schemas based on page_url and page_type alone
-
+- If page_type = "Home Page" AND page is blocked:
+  ALWAYS recommend WebSite and Organization (subtype per site_type mapping above)
+  Do NOT recommend any other schema type based on guesses
 ## recommended_schemas rules:
 - Only suggest schemas relevant to page_type and site_type
 ## Schema mapping by page_type (mandatory):
@@ -116,7 +119,7 @@ If page_content contains "Enable JavaScript and cookies to continue", "cf-browse
 - Only include Required and Recommended fields
 - Extract real values from page_content wherever possible; use null if not found
 - Never invent or estimate values
-
+- Never include a field whose value is an empty object {} — omit the field entirely if no value is available
 ## observations rules:
 - type "content_recommendation": use when a schema is absent AND the underlying content does not exist — always recommend the content first, then the schema
 - type "blocked_page": use only for Cloudflare/JS gate detection
