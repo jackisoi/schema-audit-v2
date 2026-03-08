@@ -250,7 +250,7 @@ EXISTING SCHEMAS (JSON-LD):
     # First attempt
     raw = call_claude(build_prompt(5000))
     blocks = safe_parse(raw)
-    if blocks is not None:
+    if isinstance(blocks, list):
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
@@ -269,7 +269,7 @@ EXISTING SCHEMAS (JSON-LD):
     # Retry
     raw = call_claude(build_prompt(1000))
     blocks = safe_parse(raw)
-    if blocks is not None:
+    if isinstance(blocks, list):
         if blocks and isinstance(blocks[0], list):
             blocks = [item for sublist in blocks for item in (sublist if isinstance(sublist, list) else [sublist])]
         rec_types, rec_ids = extract_recommended_schemas(blocks)
