@@ -96,7 +96,7 @@ def webhook():
         import sys
         from schema_mapper import get_all_fields_for_page
 
-        for item in urls_sorted[:1]:  # רק דף הבית
+        for item in urls_sorted[1:2]:
             url       = item["URL"]
             level     = item["Level"]
             page_type = item["Page type"]
