@@ -93,8 +93,8 @@ def webhook():
         urls_sorted    = sorted(urls, key=lambda x: str(x["Level"]))
         parent_context = {}   # level → {url, recommended_schemas}
 
+        import sys
         from schema_mapper import get_all_fields_for_page
-        import sys, json
 
         for item in urls_sorted[:1]:  # רק דף הבית
             url       = item["URL"]
