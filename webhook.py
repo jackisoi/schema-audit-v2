@@ -67,9 +67,9 @@ def webhook():
         else:
             urls = urls_raw
 
-        print(f"[DEBUG RAW] q5_project={repr(data.get('q5_project'))}")
-        print(f"[DEBUG RAW] q11_typeA11={repr(data.get('q11_typeA11'))}")
-        print(f"[DEBUG RAW] q6_typeA={repr(data.get('q6_typeA'))}")
+        print(f"[DEBUG RAW FULL] data keys: {list(data.keys())}")
+        print(f"[DEBUG RAW FULL] raw request.form keys: {list(request.form.keys())}")
+        print(f"[DEBUG RAW FULL] rawRequest value: {repr(request.form.get('rawRequest', ''))[:500]}")
         print(f"Project: {project} | Site type: {site_type} | URLs: {len(urls)}")
 
         project_page_id = get_or_create_project_page(project)
