@@ -147,7 +147,7 @@ def write_report_to_notion(project_page_id, url, analysis, page_type,
         "page_type":      page_type,
         "parent_schemas": parent_schemas or {},
     }
-    blocks = build_report_blocks(analysis, context)
+    blocks = analysis.get("blocks") or build_report_blocks(analysis, context)
     title  = f"Schema Report — {url}"
     all_blocks = []
     if used_retry:
