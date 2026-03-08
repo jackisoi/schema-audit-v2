@@ -82,9 +82,20 @@ def webhook():
 
         from schema_mapper import get_all_fields_for_page
         import sys
-        test = get_all_fields_for_page("Home Page", site_type)
-        print(f"[DEBUG STEP 1] schema_mapper output: {test}")
-        sys.exit("STEP 1 OK")
+
+        for item in urls_sorted[:1]:  # רק דף הבית
+            url       = item["URL"]
+            level     = item["Level"]
+            page_type = item["Page type"]
+            scan = scan_page(url)
+            pt   = scan.get("page_text", {})
+            ca   = scan.get("content_analysis", {})
+            print(f"[DEBUG STEP 2] url={url}")
+            print(f"  scraper_used={scan.get('scraper_used')}")
+            print(f"  raw_len={len(pt.get('text') or '')}")
+            print(f"  h1={ca.get('h1')}")
+            print(f"  json-ld count={len(scan['structured_data'].get('json-ld', []))}")
+            sys.exit("STEP 2 OK — בדוק פלט")
 
         for item in urls_sorted:
             url       = item["URL"]
