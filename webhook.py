@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify
 from notion_client import Client
 from scraper import scan_page
 from ai_router import (
+    analyze_page_v2,
     extract_schema_values,
     generate_executive_summary,
     generate_qa_report,
@@ -119,46 +120,32 @@ def webhook():
                             existing_valid.extend(t)
 
             # קבל שדות נדרשים
+            # שלב 1: schema_mapper
             schemas_fields = get_all_fields_for_page(page_type, site_type, existing_valid=existing_valid)
-            print(f"  [hybrid] schemas to extract: {[s['schema_type'] for s in schemas_fields]}")
+            missing        = [s["schema_type"] for s in schemas_fields]
 
-            used_retry = False
-
-            if not schemas_fields:
-                print(f"  [hybrid] All schemas valid — skipping Claude")
-                analysis = {
-                    "existing_schemas": {
-                        "valid":  list(set(existing_valid)),
-                        "issues": []
-                    },
-                    "recommended_schemas": [],
-                    "observations": [{
-                        "type": "info",
-                        "text": "All recommended schemas already present."
-                    }]
-                }
-            else:
+            # שלב 2: extract values (Claude קצר)
+            extracted = {}
+            if schemas_fields:
                 pt        = scan.get("page_text", {})
                 page_text = pt.get("text") or ""
                 extracted = extract_schema_values(page_text, schemas_fields, url=url)
                 print(f"  [hybrid] extracted keys: {list(extracted.keys())}")
 
-                recommended_schemas = []
-                for s in schemas_fields:
-                    schema_type = s["schema_type"]
-                    recommended_schemas.append({
-                        "type":   schema_type,
-                        "fields": extracted.get(schema_type, {}),
-                    })
+            schema_context = {
+                "already_valid":    list(set(existing_valid)),
+                "missing_schemas":  missing,
+                "extracted_values": extracted,
+            }
 
-                analysis = {
-                    "existing_schemas": {
-                        "valid":  list(set(existing_valid)),
-                        "issues": []
-                    },
-                    "recommended_schemas": recommended_schemas,
-                    "observations": []
-                }
+            # שלב 3: Claude מלא — מנתח + בונה דוח
+            result     = analyze_page_v2(
+                scan, level, page_type, site_type,
+                parent_context=parent_context,
+                schema_context=schema_context
+            )
+            analysis   = result["analysis"]
+            used_retry = result["used_retry"]
 
             parent_context[level] = {
                 "url":                url,
@@ -178,6 +165,7 @@ def webhook():
                 used_retry=used_retry,
             )
             print(f"  Done: {notion_url}")
+            import sys; sys.exit("בדוק דוח דף הבית ב-Notion לפני שממשיכים")
             results.append({"url": url, "notion": notion_url})
             page_summaries.append({
                 "url":           url,

@@ -160,7 +160,7 @@ def safe_parse(raw_text):
             return None
 
 
-def analyze_with_scan(scan_result, level, page_type, project, parent_context=None):
+def analyze_with_scan(scan_result, level, page_type, project, parent_context=None, schema_context=None):
     url = scan_result["url"]
     sd = scan_result["structured_data"]
     ca = scan_result["content_analysis"]
@@ -201,6 +201,18 @@ Email: {ca.get('contact_info', {}).get('email') or 'Not found'}"""
     is_subpage = len(path_parts) >= 2
     subpage_note = "YES - reference parent @id, do not redefine parent entity" if is_subpage else "NO - this is a top-level page"
 
+    schema_context_section = ""
+    if schema_context:
+        valid     = ", ".join(schema_context.get("already_valid", []))    or "none"
+        missing   = ", ".join(schema_context.get("missing_schemas", [])) or "none"
+        extracted = json.dumps(schema_context.get("extracted_values", {}), ensure_ascii=False)
+        schema_context_section = f"""
+PRE-COMPUTED SCHEMA ANALYSIS:
+Already valid (do not redefine): {valid}
+Missing / needs implementation: {missing}
+Extracted values from page (use these in JSON-LD, do not guess): {extracted}
+"""
+
     parent_section = ""
     if parent_context:
         parent_section = "\nRECOMMENDED SCHEMAS FROM PARENT PAGES:\n"
@@ -218,6 +230,7 @@ Project: {project}
 Page type: {page_type}
 Level: {level}
 {parent_section}
+{schema_context_section}
 CONTENT ANALYSIS:
 {content_summary}
 
@@ -519,8 +532,12 @@ def generate_text(prompt):
         messages=[{"role": "user", "content": prompt}]
     )
     return message.content[0].text
-def analyze_page_v2(scan_result, level, page_type, site_type, parent_context=None):
-    result = analyze_with_scan(scan_result, level, page_type, site_type, parent_context=parent_context)
+def analyze_page_v2(scan_result, level, page_type, site_type, parent_context=None, schema_context=None):
+    result = analyze_with_scan(
+        scan_result, level, page_type, site_type,
+        parent_context=parent_context,
+        schema_context=schema_context
+    )
     analysis = {
         "blocks":               result["blocks"],
         "recommended_schemas":  [{"type": t} for t in result["recommended_schemas"]],
